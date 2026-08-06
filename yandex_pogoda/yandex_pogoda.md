@@ -33,7 +33,7 @@
     *   **Header name:** `Authorization`
     *   **Header value:** `Bearer ВАШ_ТОКЕН_HA`
 
-    *   **Источник 2 (Вспомогательный сенсор виджета):**
+**Источник 2 (Вспомогательный сенсор виджета):**
 *   **Basic Information**
     *   **Name:** `HA Yandex Pogoda E-Paper`
     *   **Type:** `JSON API`
