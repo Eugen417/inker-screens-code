@@ -34,7 +34,14 @@ template:
 ### Способ А: Быстрый импорт (Screen Code)
 1. В Inker перейдите в раздел **Screens > Import**.
 2. Откройте файл [inker_screen.json](inker_screen.json) в этом репозитории, скопируйте его содержимое целиком и нажмите **Import Screen**.
-3. После импорта обязательно зайдите в раздел Data Sources...
+3. После импорта обязательно зайдите в раздел Data Sources, внесите изменения в:
+*   **Connection**
+    *   **URL:** `http://homeassistant.local:8123/api/states/weather.yandex_pogoda`
+    *   **HTTP Method:** `GET`
+*   **Custom Headers** *(Add headers for authentication)*
+    *   **Header name:** `Authorization`
+    *   **Header value:** `Bearer ВАШ_ТОКЕН_HA`
+ ---  
 
 ### Способ Б: Ручная настройка
 Если вы хотите собрать экран с нуля, сначала необходимо добавить два источника данных в разделе **Data Sources**, а затем вручную расставить виджеты (см. пункт 4).
