@@ -438,7 +438,75 @@ let svg = `
 return "data:image/svg+xml;charset=utf-8," + encodeURIComponent(svg.replace(/\n\s*/g, ''));
 ```
 
+### 📌 Виджет: ЯП Прогноз на два дня краткий
+
+```javascript
+// 1. ПРОГНОЗ НА 2 ДНЯ (Берем только дневные)
+let forecastDaily = $?.attributes?.forecast_twice_daily || [];
+let days = forecastDaily.filter(d => d.is_daytime === true).slice(0, 2);
+
+if (days.length === 0) {
+  return "data:image/svg+xml;charset=utf-8," + encodeURIComponent(`<svg width="270" height="180"><text y="20" fill="red">Нет данных</text></svg>`);
+}
+
+let w = 270; 
+let h = 180;
+let elements = "";
+const daysOfWeek = ['ВС', 'ПН', 'ВТ', 'СР', 'ЧТ', 'ПТ', 'СБ'];
+
+function getIconId(cond) {
+  if (!cond) return "i-cloud";
+  if (cond.includes('clear')) return 'i-sun';
+  if (cond.includes('partly')) return 'i-psun';
+  if (cond.includes('rain') || cond.includes('pour') || cond.includes('shower') || cond.includes('hail')) return 'i-rain';
+  if (cond.includes('snow') || cond.includes('sleet')) return 'i-snow';
+  return "i-cloud";
+}
+
+let defs = `
+  <defs>
+    <g id="i-sun"><circle cx="12" cy="12" r="5"/><path d="M19 12h3 M12 19v3 M5 12H2 M12 5V2 M16.95 16.95l2.12 2.12 M7.05 16.95l-2.12 2.12 M7.05 7.05l-2.12-2.12 M16.95 7.05l2.12-2.12"/></g>
+    <g id="i-psun"><path d="M19 12h3 M12 5V2 M16.95 16.95l2.12 2.12 M7.05 7.05l-2.12-2.12 M16.95 7.05l2.12-2.12"/><path d="M16 13a4 4 0 0 0-6-4.13"/><path d="M13 22H7a5 5 0 1 1 4.9-6H13a3 3 0 0 1 0 6Z"/></g>
+    <g id="i-cloud"><path d="M17.5 19H9a7 7 0 1 1 6.7-9h1.8a4.5 4.5 0 1 1 0 9Z"/></g>
+    <g id="i-rain"><path d="M4 15A7 7 0 1 1 15.7 8h1.8a4.5 4.5 0 0 1 2.5 8.2"/><path d="M16 14v6m-8-6v6m4-4v6"/></g>
+    <g id="i-snow"><path d="M4 15A7 7 0 1 1 15.7 8h1.8a4.5 4.5 0 0 1 2.5 8.2"/><path d="M8 15h.01m0 4h.01m4-2h.01m0 4h.01m4-6h.01m0 4h.01"/></g>
+  </defs>
+`;
+
+days.forEach((day, i) => {
+  let date = new Date(day.datetime);
+  let name = daysOfWeek[date.getDay()] + " " + date.getDate().toString().padStart(2,'0') + "." + (date.getMonth()+1).toString().padStart(2,'0');
+  let high = Math.round(day.native_temperature);
+  let low = Math.round(day.native_templow || (high-5));
+  let icon = getIconId(day.condition);
+  
+  let hasRain = day.condition && (day.condition.includes('rain') || day.condition === 'snowy' || day.condition === 'pouring' || day.condition === 'hail' || day.condition === 'showers');
+  let rainText = hasRain ? "Осадки" : "Без осадков";
+  
+  let x = days.length === 1 ? (w/2) : (i === 0 ? 65 : 205); 
+  
+  elements += `
+    <text x="${x}" y="25" text-anchor="middle" font-family="Arial, sans-serif" font-size="20" font-weight="bold" fill="#000">${name}</text>
+    <text x="${x}" y="65" text-anchor="middle" font-family="Arial, sans-serif" font-size="28" font-weight="bold" fill="#000">${high}°</text>
+    <g transform="translate(${x-20}, 78) scale(1.6)"><use href="#${icon}" stroke="#000" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/></g>
+    <text x="${x}" y="145" text-anchor="middle" font-family="Arial, sans-serif" font-size="22" font-weight="bold" fill="#000">~${low}°</text>
+    <text x="${x}" y="170" text-anchor="middle" font-family="Arial, sans-serif" font-size="15" font-weight="bold" fill="#000">${rainText}</text>
+  `;
+});
+
+let svg = `
+<svg xmlns="[http://www.w3.org/2000/svg](http://www.w3.org/2000/svg)" width="${w}" height="${h}" viewBox="0 0 ${w}${h}">
+  ${defs}${elements}
+</svg>`;
+
+return "data:image/svg+xml;charset=utf-8," + encodeURIComponent(svg.replace(/\n\s*/g, ''));
+```
 ### 📌 Виджет: ЯП Сегодня основной
+> **Внимание:** Для этого виджета используется вспомогательный сенсор!
+*   **Data Source:** `HA Yandex Pogoda E-Paper`
+*   **Choose Display Type:** `Grid`
+*   **Display As:** `Image`
+*   **Grid Settings:** Columns: `1`, Rows: `1`
 
 ```javascript
 try {
@@ -599,68 +667,4 @@ try {
 } catch (err) {
   return "data:image/svg+xml;charset=utf-8," + encodeURIComponent(`<svg width="300" height="180"><text y="20" font-family="Arial" font-size="14" fill="#000">Ошибка: ${err.message}</text></svg>`);
 }
-```
-
-### 📌 Виджет: ЯП Прогноз на два дня краткий
-
-```javascript
-// 1. ПРОГНОЗ НА 2 ДНЯ (Берем только дневные)
-let forecastDaily = $?.attributes?.forecast_twice_daily || [];
-let days = forecastDaily.filter(d => d.is_daytime === true).slice(0, 2);
-
-if (days.length === 0) {
-  return "data:image/svg+xml;charset=utf-8," + encodeURIComponent(`<svg width="270" height="180"><text y="20" fill="red">Нет данных</text></svg>`);
-}
-
-let w = 270; 
-let h = 180;
-let elements = "";
-const daysOfWeek = ['ВС', 'ПН', 'ВТ', 'СР', 'ЧТ', 'ПТ', 'СБ'];
-
-function getIconId(cond) {
-  if (!cond) return "i-cloud";
-  if (cond.includes('clear')) return 'i-sun';
-  if (cond.includes('partly')) return 'i-psun';
-  if (cond.includes('rain') || cond.includes('pour') || cond.includes('shower') || cond.includes('hail')) return 'i-rain';
-  if (cond.includes('snow') || cond.includes('sleet')) return 'i-snow';
-  return "i-cloud";
-}
-
-let defs = `
-  <defs>
-    <g id="i-sun"><circle cx="12" cy="12" r="5"/><path d="M19 12h3 M12 19v3 M5 12H2 M12 5V2 M16.95 16.95l2.12 2.12 M7.05 16.95l-2.12 2.12 M7.05 7.05l-2.12-2.12 M16.95 7.05l2.12-2.12"/></g>
-    <g id="i-psun"><path d="M19 12h3 M12 5V2 M16.95 16.95l2.12 2.12 M7.05 7.05l-2.12-2.12 M16.95 7.05l2.12-2.12"/><path d="M16 13a4 4 0 0 0-6-4.13"/><path d="M13 22H7a5 5 0 1 1 4.9-6H13a3 3 0 0 1 0 6Z"/></g>
-    <g id="i-cloud"><path d="M17.5 19H9a7 7 0 1 1 6.7-9h1.8a4.5 4.5 0 1 1 0 9Z"/></g>
-    <g id="i-rain"><path d="M4 15A7 7 0 1 1 15.7 8h1.8a4.5 4.5 0 0 1 2.5 8.2"/><path d="M16 14v6m-8-6v6m4-4v6"/></g>
-    <g id="i-snow"><path d="M4 15A7 7 0 1 1 15.7 8h1.8a4.5 4.5 0 0 1 2.5 8.2"/><path d="M8 15h.01m0 4h.01m4-2h.01m0 4h.01m4-6h.01m0 4h.01"/></g>
-  </defs>
-`;
-
-days.forEach((day, i) => {
-  let date = new Date(day.datetime);
-  let name = daysOfWeek[date.getDay()] + " " + date.getDate().toString().padStart(2,'0') + "." + (date.getMonth()+1).toString().padStart(2,'0');
-  let high = Math.round(day.native_temperature);
-  let low = Math.round(day.native_templow || (high-5));
-  let icon = getIconId(day.condition);
-  
-  let hasRain = day.condition && (day.condition.includes('rain') || day.condition === 'snowy' || day.condition === 'pouring' || day.condition === 'hail' || day.condition === 'showers');
-  let rainText = hasRain ? "Осадки" : "Без осадков";
-  
-  let x = days.length === 1 ? (w/2) : (i === 0 ? 65 : 205); 
-  
-  elements += `
-    <text x="${x}" y="25" text-anchor="middle" font-family="Arial, sans-serif" font-size="20" font-weight="bold" fill="#000">${name}</text>
-    <text x="${x}" y="65" text-anchor="middle" font-family="Arial, sans-serif" font-size="28" font-weight="bold" fill="#000">${high}°</text>
-    <g transform="translate(${x-20}, 78) scale(1.6)"><use href="#${icon}" stroke="#000" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/></g>
-    <text x="${x}" y="145" text-anchor="middle" font-family="Arial, sans-serif" font-size="22" font-weight="bold" fill="#000">~${low}°</text>
-    <text x="${x}" y="170" text-anchor="middle" font-family="Arial, sans-serif" font-size="15" font-weight="bold" fill="#000">${rainText}</text>
-  `;
-});
-
-let svg = `
-<svg xmlns="[http://www.w3.org/2000/svg](http://www.w3.org/2000/svg)" width="${w}" height="${h}" viewBox="0 0 ${w}${h}">
-  ${defs}${elements}
-</svg>`;
-
-return "data:image/svg+xml;charset=utf-8," + encodeURIComponent(svg.replace(/\n\s*/g, ''));
 ```
