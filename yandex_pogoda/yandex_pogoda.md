@@ -8,19 +8,18 @@
 
 ### Настройка Home Assistant (Создание сенсора)
 
-Вспомогательный сенсор собирает необходимые атрибуты для вывода на экран. Добавьте следующий код в конфигурацию HA (в раздел `packages` или `template`):
+Вспомогательный сенсор собирает необходимые атрибуты для вывода на экран. Добавьте следующий код в конфигурацию HA (в раздел `packages` или `template`): `add_yandex_pogoda_sunset_sunrise.yaml`
 
 ```yaml
 template:
   - trigger:
-      # Обновляем наш сенсор каждый раз, когда обновляется сама Яндекс.Погода
-      - platform: state
-        entity_id: weather.yandex_pogoda
-      # И при старте системы
+      # Запрашиваем стабильно раз в 15 минут, игнорируя промежуточные скачки статуса
+      - platform: time_pattern
+        minutes: "/15"
+      # И при старте системы (оставляем)
       - platform: homeassistant
         event: start
     action:
-      # Запрашиваем почасовой прогноз через новую службу
       - service: weather.get_forecasts
         data:
           type: hourly
@@ -30,12 +29,14 @@ template:
     sensor:
       - name: "Eink Weather Widget"
         unique_id: eink_weather_widget
+        icon: mdi:weather-cloudy-alert
         state: "{{ states('weather.yandex_pogoda') }}"
         attributes:
+          friendly_name: Eink Weather Widget
           temperature: "{{ state_attr('weather.yandex_pogoda', 'temperature') }}"
           apparent_temperature: "{{ state_attr('weather.yandex_pogoda', 'apparent_temperature') }}"
           yandex_condition: "{{ state_attr('weather.yandex_pogoda', 'yandex_condition') }}"
-          # Берем прогноз из переменной ответа службы (и переводим в json)
+          # Оставляем всё как было у вас - это правильно!
           forecast_hourly: "{{ hourly_forecast['weather.yandex_pogoda'].forecast | to_json }}"
           next_rising: "{{ state_attr('sun.sun', 'next_rising') }}"
           next_setting: "{{ state_attr('sun.sun', 'next_setting') }}"
@@ -577,9 +578,9 @@ try {
     'clear': 'Ясно', 'clear-night': 'Ясно', 
     'partly_cloudy': 'Малооблачно', 'partlycloudy': 'Малооблачно',
     'cloudy': 'Облачно', 'overcast': 'Пасмурно',
-    'light_rain': 'Небольшой дождь', 'rain': 'Дождь', 'rainy': 'Дождь',
+    'light_rain': 'Неб. дождь', 'rain': 'Дождь', 'rainy': 'Дождь',
     'heavy_rain': 'Сильный дождь', 'showers': 'Ливень', 'pouring': 'Ливень',
-    'sleet': 'Мокрый снег', 'light_snow': 'Небольшой снег', 'snow': 'Снег', 'snowy': 'Снег', 'snowfall': 'Снегопад',
+    'sleet': 'Мокрый снег', 'light_snow': 'Неб. снег', 'snow': 'Снег', 'snowy': 'Снег', 'snowfall': 'Снегопад',
     'hail': 'Град', 'thunderstorm': 'Гроза', 'lightning': 'Гроза'
   };
   let condText = condMap[cond_raw] || 'Облачно';
@@ -591,17 +592,19 @@ try {
   else if (cond_raw.match(/rain|pour|shower|hail|light/)) iconId = 'i-rain';
   else if (cond_raw.match(/snow|sleet/)) iconId = 'i-snow';
 
-  // 5. АНАЛИЗАТОР НА СЕГОДНЯ
+  // 5. АНАЛИЗАТОР СТРОГО НА СЕГОДНЯ
   let minTemp = t_curr;
   let maxTemp = t_curr;
-  let rainHours = [];
   let rainText = "Сегодня без осадков.";
 
   if (forecast && forecast.length > 0) {
-    let todayStr = new Date().toISOString().split('T')[0];
-    if (forecast[0].datetime) todayStr = forecast[0].datetime.split('T')[0];
-
+    // Берем дату самого первого часа (это и есть "сегодня")
+    let todayStr = forecast[0].datetime.split('T')[0];
+    
+    // Оставляем часы СТРОГО до полуночи текущего дня
     let todayData = forecast.filter(d => d.datetime && d.datetime.startsWith(todayStr));
+    
+    // Фолбек на случай сбоя дат (берем ближайшие 12 часов)
     if (todayData.length === 0) todayData = forecast.slice(0, 12);
 
     let temps = todayData.map(d => d.native_temperature).filter(t => t !== undefined);
@@ -610,16 +613,19 @@ try {
       maxTemp = Math.max(...temps);
     }
 
-    rainHours = todayData
-      .filter(d => d.condition && (d.condition.includes('rain') || d.condition === 'snowy' || d.condition === 'pouring' || d.condition === 'hail' || d.condition === 'lightning'))
+    // Умный поиск ЛЮБЫХ видов осадков (ищет по корням слов)
+    let rainHours = todayData
+      .filter(d => d.condition && d.condition.match(/rain|snow|sleet|pour|shower|hail|thunder|lightning/i))
       .map(d => new Date(d.datetime).getHours());
 
     if (rainHours.length > 0) {
       let groups = [];
       let start = rainHours[0], prev = rainHours[0];
+      
       for (let i = 1; i < rainHours.length; i++) {
-        if (rainHours[i] === prev + 1) { prev = rainHours[i]; } 
-        else {
+        if (rainHours[i] === prev + 1) { 
+            prev = rainHours[i]; 
+        } else {
           groups.push(`с ${start}:00 до ${prev + 1}:00`);
           start = rainHours[i]; prev = rainHours[i];
         }
@@ -639,7 +645,7 @@ try {
   let h = 180;
 
   let svg = `
-  <svg xmlns="[http://www.w3.org/2000/svg](http://www.w3.org/2000/svg)" width="${w}" height="${h}" viewBox="0 0 600 360">
+  <svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}" viewBox="0 0 600 360">
     <defs>
       <g id="i-sun">
         <circle cx="12" cy="12" r="5"/>
