@@ -30,7 +30,8 @@
     *   **URL:** `http://homeassistant.local:8123/api/states/sensor.eink_weather_widget`
     *   **HTTP Method:** `GET`
 *   **Custom Headers** *(Add headers for authentication)*
-    *   **Authorization:** `Bearer ВАШ_ТОКЕН`
+    *   **Header name:** `Authorization`
+    *   **Header value:** `Bearer ВАШ_ТОКЕН`
 
 **Источник 2 (Основной, Yandex Pogoda):**
 *   **Basic Information**
