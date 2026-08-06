@@ -12,7 +12,22 @@
 
 ```yaml
 template:
-  - sensor:
+  - trigger:
+      # Обновляем наш сенсор каждый раз, когда обновляется сама Яндекс.Погода
+      - platform: state
+        entity_id: weather.yandex_pogoda
+      # И при старте системы
+      - platform: homeassistant
+        event: start
+    action:
+      # Запрашиваем почасовой прогноз через новую службу
+      - service: weather.get_forecasts
+        data:
+          type: hourly
+        target:
+          entity_id: weather.yandex_pogoda
+        response_variable: hourly_forecast
+    sensor:
       - name: "Eink Weather Widget"
         unique_id: eink_weather_widget
         state: "{{ states('weather.yandex_pogoda') }}"
@@ -20,7 +35,8 @@ template:
           temperature: "{{ state_attr('weather.yandex_pogoda', 'temperature') }}"
           apparent_temperature: "{{ state_attr('weather.yandex_pogoda', 'apparent_temperature') }}"
           yandex_condition: "{{ state_attr('weather.yandex_pogoda', 'yandex_condition') }}"
-          forecast_hourly: "{{ state_attr('weather.yandex_pogoda', 'forecast_hourly') | to_json }}"
+          # Берем прогноз из переменной ответа службы (и переводим в json)
+          forecast_hourly: "{{ hourly_forecast['weather.yandex_pogoda'].forecast | to_json }}"
           next_rising: "{{ state_attr('sun.sun', 'next_rising') }}"
           next_setting: "{{ state_attr('sun.sun', 'next_setting') }}"
 ```
