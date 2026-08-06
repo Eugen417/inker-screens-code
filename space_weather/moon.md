@@ -1,3 +1,6 @@
+<img width="1512" height="860" alt="Снимок экрана — 2026-08-06 в 21 19 26" src="https://github.com/user-attachments/assets/43306658-0113-4df0-8fb5-a6c3d643a888" />
+
+
 Требования:
 Установленная и настроенная интеграция [Lunar Phase Integration for Home Assistant](https://github.com/ngocjohn/lunar-phase)
 Установлен пользовательский датчик
