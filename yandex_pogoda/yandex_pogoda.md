@@ -4,6 +4,30 @@
 
 Краткое руководство по настройке погодного информера для дисплеев Inker с использованием интеграции Yandex Pogoda из Home Assistant (HA).
 
+У вас должна быть настроена интеграция Yandx Pogoda и вспомагательный датчик:
+Настройка Home Assistant (Создание сенсора)
+
+Вспомогательный сенсор собирает необходимые атрибуты для вывода на экран. Добавьте следующий код в конфигурацию HA (в раздел `packages` или `template`):
+
+```yaml
+template:
+  - sensor:
+      - name: "Eink Weather Widget"
+        unique_id: eink_weather_widget
+        state: "{{ states('weather.yandex_pogoda') }}"
+        attributes:
+          temperature: "{{ state_attr('weather.yandex_pogoda', 'temperature') }}"
+          apparent_temperature: "{{ state_attr('weather.yandex_pogoda', 'apparent_temperature') }}"
+          yandex_condition: "{{ state_attr('weather.yandex_pogoda', 'yandex_condition') }}"
+          forecast_hourly: "{{ state_attr('weather.yandex_pogoda', 'forecast_hourly') | to_json }}"
+          next_rising: "{{ state_attr('sun.sun', 'next_rising') }}"
+          next_setting: "{{ state_attr('sun.sun', 'next_setting') }}"
+```
+
+> **Проверка:** Перед установкой виджетов зайдите в HA в меню *Панель разработчика > Состояния* и убедитесь, что сущности `weather.yandex_pogoda` и `sensor.eink_weather_widget` существуют и отдают данные.
+
+
+
 ## 1. Способы установки
 
 Установить информер можно двумя способами:
@@ -46,30 +70,7 @@
 
 ---
 
-## 3. Настройка Home Assistant (Создание сенсора)
-
-Вспомогательный сенсор собирает необходимые атрибуты для вывода на экран. Добавьте следующий код в конфигурацию HA (в раздел `packages` или `template`):
-
-```yaml
-template:
-  - sensor:
-      - name: "Eink Weather Widget"
-        unique_id: eink_weather_widget
-        state: "{{ states('weather.yandex_pogoda') }}"
-        attributes:
-          temperature: "{{ state_attr('weather.yandex_pogoda', 'temperature') }}"
-          apparent_temperature: "{{ state_attr('weather.yandex_pogoda', 'apparent_temperature') }}"
-          yandex_condition: "{{ state_attr('weather.yandex_pogoda', 'yandex_condition') }}"
-          forecast_hourly: "{{ state_attr('weather.yandex_pogoda', 'forecast_hourly') | to_json }}"
-          next_rising: "{{ state_attr('sun.sun', 'next_rising') }}"
-          next_setting: "{{ state_attr('sun.sun', 'next_setting') }}"
-```
-
-> **Проверка:** Перед установкой виджетов зайдите в HA в меню *Панель разработчика > Состояния* и убедитесь, что сущности `weather.yandex_pogoda` и `sensor.eink_weather_widget` существуют и отдают данные.
-
----
-
-## 4. Ручное добавление виджетов (Библиотека)
+## 3. Ручное добавление виджетов (Библиотека)
 
 Для каждого виджета из списка ниже необходимо применять **общие базовые настройки** (если не указано иное):
 *   **Data Source:** `HA Yandex Pogoda` *(или `HA Yandex Pogoda` — см. указания к виджету)*
