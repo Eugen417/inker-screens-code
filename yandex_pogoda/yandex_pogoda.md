@@ -22,7 +22,18 @@
 
 Для ручной настройки (Способ Б) создайте два источника со следующими параметрами:
 
-**Источник 1 (Вспомогательный сенсор виджета):**
+**Источник 1 (Основной, Yandex Pogoda):**
+*   **Basic Information**
+    *   **Name:** `HA Yandex Pogoda`
+    *   **Type:** `JSON API`
+*   **Connection**
+    *   **URL:** `http://homeassistant.local:8123/api/states/weather.yandex_pogoda`
+    *   **HTTP Method:** `GET`
+*   **Custom Headers** *(Add headers for authentication)*
+    *   **Header name:** `Authorization`
+    *   **Header value:** `Bearer ВАШ_ТОКЕН_HA`
+
+    *   **Источник 2 (Вспомогательный сенсор виджета):**
 *   **Basic Information**
     *   **Name:** `HA Yandex Pogoda E-Paper`
     *   **Type:** `JSON API`
@@ -33,16 +44,6 @@
     *   **Header name:** `Authorization`
     *   **Header value:** `Bearer ВАШ_ТОКЕН_HA`
 
-**Источник 2 (Основной, Yandex Pogoda):**
-*   **Basic Information**
-    *   **Name:** `HA Yandex Pogoda`
-    *   **Type:** `JSON API`
-*   **Connection**
-    *   **URL:** `http://homeassistant.local:8123/api/states/weather.yandex_pogoda`
-    *   **HTTP Method:** `GET`
-*   **Custom Headers** *(Add headers for authentication)*
-    *   **Header name:** `Authorization`
-    *   **Header value:** `Bearer ВАШ_ТОКЕН_HA`
 ---
 
 ## 3. Настройка Home Assistant (Создание сенсора)
