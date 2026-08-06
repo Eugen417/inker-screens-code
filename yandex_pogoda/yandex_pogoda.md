@@ -40,8 +40,8 @@
     *   **URL:** `http://homeassistant.local:8123/api/states/weather.yandex_pogoda`
     *   **HTTP Method:** `GET`
 *   **Custom Headers** *(Add headers for authentication)*
-    *   **Authorization:** `Bearer ВАШ_ТОКЕН`
-
+    *   **Header name:** `Authorization`
+    *   **Header value:** `Bearer ВАШ_ТОКЕН`
 ---
 
 ## 3. Настройка Home Assistant (Создание сенсора)
