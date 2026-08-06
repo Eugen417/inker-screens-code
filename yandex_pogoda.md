@@ -14,7 +14,6 @@ template:
           temperature: "{{ state_attr('weather.yandex_pogoda', 'temperature') }}"
           apparent_temperature: "{{ state_attr('weather.yandex_pogoda', 'apparent_temperature') }}"
           yandex_condition: "{{ state_attr('weather.yandex_pogoda', 'yandex_condition') }}"
-          # Вот здесь главное изменение:
           forecast_hourly: "{{ state_attr('weather.yandex_pogoda', 'forecast_hourly') | to_json }}"
           next_rising: "{{ state_attr('sun.sun', 'next_rising') }}"
           next_setting: "{{ state_attr('sun.sun', 'next_setting') }}"
