@@ -24,7 +24,7 @@
 
 **Источник 1 (Вспомогательный сенсор виджета):**
 *   **Basic Information**
-    *   **Name:** `HA Yandex Pogoda`
+    *   **Name:** `HA Yandex Pogoda E-Paper`
     *   **Type:** `JSON API`
 *   **Connection**
     *   **URL:** `http://homeassistant.local:8123/api/states/sensor.eink_weather_widget`
