@@ -10,10 +10,10 @@
 Для работы информера в Inker необходимо создать два источника данных:
 
 1. **Основной источник (Yandex Pogoda):**
-   * **Name:** `HA Yandex Pogoda E-Paper`
+   * **Name:** `HA Yandex Pogoda`
    * **Connection URL:** `http://homeassistant.local:8123/api/states/weather.yandex_pogoda`
 2. **Вспомогательный источник (Сенсор виджета):**
-   * **Name:** `HA Yandex Pogoda`
+   * **Name:** `HA Yandex Pogoda E-Paper`
    * **Connection URL:** `http://homeassistant.local:8123/api/states/sensor.eink_weather_widget`
 
 > **Важно:** После добавления источников в Inker, перейдите в раздел **Custom Headers** (Add headers for authentication or custom requirements) и добавьте свой Long-Lived Access Token для авторизации в Home Assistant.  
