@@ -580,7 +580,7 @@ return "data:image/svg+xml;charset=utf-8," + encodeURIComponent(svg.replace(/\n\
 ---
 
 ### 📌 Виджет 7: ЯП Сегодня основной
-> **Внимание:** Для этого виджета необходимо переключить **Data Source** на основной источник интеграции!
+> **Внимание:** Для этого виджета необходимо переключить **Data Source** на вспомагательный источник интеграции!
 *   **Data Source:** `HA Yandex Pogoda E-Paper`
 *   **Field:** `entity_id`
 
