@@ -24,7 +24,7 @@
 
 **Источник 1 (Вспомогательный сенсор виджета):**
 *   **Basic Information**
-    *   **Name:** `HA Yandex Pogoda E-Paper`
+    *   **Name:** `HA Yandex Pogoda`
     *   **Type:** `JSON API`
 *   **Connection**
     *   **URL:** `http://homeassistant.local:8123/api/states/sensor.eink_weather_widget`
@@ -70,7 +70,7 @@ template:
 ## 4. Ручное добавление виджетов (Библиотека)
 
 Для каждого виджета из списка ниже необходимо применять **общие базовые настройки** (если не указано иное):
-*   **Data Source:** `HA Yandex Pogoda E-Paper` *(или `HA Yandex Pogoda` — см. указания к виджету)*
+*   **Data Source:** `HA Yandex Pogoda` *(или `HA Yandex Pogoda` — см. указания к виджету)*
 *   **Choose Display Type:** `Grid`
 *   **Field:** `не влияет на наши виджеты, но к заполнению обязательно, ниже указаны для каждого виджета`
 *   **Display As:** `Image` *(Обязательно для корректного отображения SVG-графики!)*
@@ -81,7 +81,7 @@ template:
 ---
 
 ### 📌 Виджет 1: ЯП Направление и скорость ветра компас
-*   **Data Source:** `HA Yandex Pogoda E-Paper`
+*   **Data Source:** `HA Yandex Pogoda`
 *   **Field:** `attributes.wind_bearing`
 
 <details>
@@ -149,7 +149,7 @@ return "data:image/svg+xml;charset=utf-8," + encodeURIComponent(svg.replace(/\n\
 
 ### 📌 Виджет 2: ЯП График температуры на 12 часов
 *(Примечание: скрипт автоматически обрабатывает прогноз на 24 часа для плавной визуализации)*
-*   **Data Source:** `HA Yandex Pogoda E-Paper`
+*   **Data Source:** `HA Yandex Pogoda`
 *   **Field:** `attributes.forecast_hourly`
 
 <details>
@@ -237,7 +237,7 @@ return "data:image/svg+xml;charset=utf-8," + encodeURIComponent(svg.replace(/\n\
 ---
 
 ### 📌 Виджет 3: ЯП График сила и направление ветра на 12 ч
-*   **Data Source:** `HA Yandex Pogoda E-Paper`
+*   **Data Source:** `HA Yandex Pogoda`
 *   **Field:** `attributes.forecast_hourly`
 
 <details>
@@ -314,7 +314,7 @@ return "data:image/svg+xml;charset=utf-8," + encodeURIComponent(svg.replace(/\n\
 ---
 
 ### 📌 Виджет 4: ЯП Прогноз на завтра
-*   **Data Source:** `HA Yandex Pogoda E-Paper`
+*   **Data Source:** `HA Yandex Pogoda`
 *   **Field:** `entity_id`
 
 <details>
@@ -423,7 +423,7 @@ return "data:image/svg+xml;charset=utf-8," + encodeURIComponent(svg.replace(/\n\
 ---
 
 ### 📌 Виджет 5: ЯП Ощущаемая и Мин/Макс
-*   **Data Source:** `HA Yandex Pogoda E-Paper`
+*   **Data Source:** `HA Yandex Pogoda`
 *   **Field:** `entity_id`
 
 <details>
@@ -506,7 +506,7 @@ return "data:image/svg+xml;charset=utf-8," + encodeURIComponent(svg.replace(/\n\
 ---
 
 ### 📌 Виджет 6: ЯП Прогноз на два дня краткий
-*   **Data Source:** `HA Yandex Pogoda E-Paper`
+*   **Data Source:** `HA Yandex Pogoda`
 *   **Field:** `entity_id`
 
 <details>
@@ -579,7 +579,7 @@ return "data:image/svg+xml;charset=utf-8," + encodeURIComponent(svg.replace(/\n\
 
 ### 📌 Виджет 7: ЯП Сегодня основной
 > **Внимание:** Для этого виджета необходимо переключить **Data Source** на основной источник интеграции!
-*   **Data Source:** `HA Yandex Pogoda`
+*   **Data Source:** `HA Yandex Pogoda E-Paper`
 *   **Field:** `entity_id`
 
 <details>
