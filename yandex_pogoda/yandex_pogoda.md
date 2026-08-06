@@ -424,90 +424,7 @@ return "data:image/svg+xml;charset=utf-8," + encodeURIComponent(svg.replace(/\n\
 
 ---
 
-### 📌 Виджет 5: ЯП Ощущаемая и Мин/Макс
-*   **Data Source:** `HA Yandex Pogoda`
-*   **Field:** `entity_id`
-
-<details>
-<summary><b>Показать код виджета (JavaScript)</b></summary>
-
-```javascript
-// 1. Берем данные из главного погодного сенсора
-let weather = $?.attributes;
-
-// Если данных нет (на всякий случай), ставим демо-значения
-let feelsLike = weather?.apparent_temperature ?? 26;
-let minTemp = 16;
-let maxTemp = 28;
-
-// 2. УМНЫЙ ПОИСК МИН/МАКС НА СЕГОДНЯ
-if (weather?.forecast_hourly && weather.forecast_hourly.length > 0) {
-    let todayStr = weather.forecast_hourly[0].datetime.split('T')[0];
-    let todayData = weather.forecast_hourly.filter(d => d.datetime.startsWith(todayStr));
-    
-    if (todayData.length > 0) {
-        let temps = todayData.map(d => d.native_temperature);
-        minTemp = Math.min(...temps);
-        maxTemp = Math.max(...temps);
-    }
-}
-
-if (weather?.forecast_twice_daily && weather.forecast_twice_daily.length > 0) {
-    let todayStr = weather.forecast_twice_daily[0].datetime.split('T')[0];
-    let todayData = weather.forecast_twice_daily.filter(d => d.datetime.startsWith(todayStr));
-    
-    if (todayData.length > 0) {
-        let highs = todayData.map(d => d.native_temperature);
-        let lows = todayData.map(d => d.native_templow).filter(v => v !== undefined && v !== null);
-        
-        if (highs.length) maxTemp = Math.max(maxTemp, ...highs);
-        if (lows.length) minTemp = Math.min(minTemp, ...lows);
-    }
-}
-
-// 3. Форматируем текст (добавляем "+" для тепла)
-let fSign = feelsLike > 0 ? "+" : "";
-let minSign = minTemp > 0 ? "+" : "";
-let maxSign = maxTemp > 0 ? "+" : "";
-
-let fText = `Ощущается: ${fSign}${Math.round(feelsLike)}°`;
-let minText = `${minSign}${Math.round(minTemp)}°`;
-let maxText = `${maxSign}${Math.round(maxTemp)}°`;
-
-// 4. Отрисовка SVG (компактный блок)
-let w = 280;
-let h = 120;
-
-let svg = `
-<svg xmlns="[http://www.w3.org/2000/svg](http://www.w3.org/2000/svg)" width="${w}" height="${h}" viewBox="0 0 ${w}${h}">
-  <style>
-    .t { font-family: Arial, sans-serif; fill: #000; font-weight: bold; }
-    .i { stroke: #000; stroke-width: 3; fill: none; stroke-linecap: round; stroke-linejoin: round; }
-  </style>
-
-  <!-- Верхняя строка: Ощущается -->
-  <text x="10" y="45" font-size="24" class="t">${fText}</text>
-  
-  <!-- Нижняя строка: Мин/Макс с аккуратными стрелками -->
-  <g transform="translate(10, 75)">
-    <!-- Иконка МИН (стрелка вниз) -->
-    <path class="i" d="M10 2v16m0 0-5-5m5 5 5-5" />
-    <text x="28" y="17" font-size="20" class="t">${minText}</text>
-    
-    <!-- Иконка МАКС (стрелка вверх) -->
-    <path class="i" d="M100 18V2m0 0-5 5m5-5 5 5" />
-    <text x="118" y="17" font-size="20" class="t">${maxText}</text>
-  </g>
-</svg>
-`;
-
-return "data:image/svg+xml;charset=utf-8," + encodeURIComponent(svg.replace(/\n\s*/g, ''));
-```
-</details>
-
----
-
-### 📌 Виджет 6: ЯП Прогноз на два дня краткий
+### 📌 Виджет 5: ЯП Прогноз на два дня краткий
 *   **Data Source:** `HA Yandex Pogoda`
 *   **Field:** `entity_id`
 
@@ -579,7 +496,7 @@ return "data:image/svg+xml;charset=utf-8," + encodeURIComponent(svg.replace(/\n\
 
 ---
 
-### 📌 Виджет 7: ЯП Сегодня основной
+### 📌 Виджет 6: ЯП Сегодня основной
 > **Внимание:** Для этого виджета необходимо переключить **Data Source** на вспомагательный источник интеграции!
 *   **Data Source:** `HA Yandex Pogoda E-Paper`
 *   **Field:** `entity_id`
