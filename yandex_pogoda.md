@@ -115,6 +115,8 @@ return "data:image/svg+xml;charset=utf-8," + encodeURIComponent(svg.replace(/\n\
 ### 📌 Виджет: ЯП График температуры на 12 часов
 *(Примечание: скрипт автоматически обрабатывает 24 часа для лучшей визуализации)*
 
+*   **Field:** `attributes.forecast_hourly`
+
 ```javascript
 // 1. Берем РЕАЛЬНЫЕ данные
 let forecast = $.attributes.forecast_hourly; 
@@ -195,6 +197,8 @@ return "data:image/svg+xml;charset=utf-8," + encodeURIComponent(svg.replace(/\n\
 
 ### 📌 Виджет: ЯП График сила и направление ветра на 12 ч
 
+*   **Field:** `attributes.forecast_hourly`
+
 ```javascript
 // 1. Берем РЕАЛЬНЫЕ данные
 let forecast = $.attributes.forecast_hourly; 
@@ -263,6 +267,8 @@ return "data:image/svg+xml;charset=utf-8," + encodeURIComponent(svg.replace(/\n\
 ```
 
 ### 📌 Виджет: ЯП Прогноз на завтра
+
+*   **Field:** `entity_id`
 
 ```javascript
 // 1. Берем РЕАЛЬНЫЕ данные
@@ -364,6 +370,8 @@ return "data:image/svg+xml;charset=utf-8," + encodeURIComponent(svg.replace(/\n\
 ```
 
 ### 📌 Виджет: ЯП Ощущаемая и Мин/Макс
+
+*   **Field:** `entity_id`
 
 ```javascript
 // 1. Берем данные из главного погодного сенсора
@@ -507,6 +515,8 @@ return "data:image/svg+xml;charset=utf-8," + encodeURIComponent(svg.replace(/\n\
 *   **Choose Display Type:** `Grid`
 *   **Display As:** `Image`
 *   **Grid Settings:** Columns: `1`, Rows: `1`
+
+*  **Field:** `entity_id`
 
 ```javascript
 try {
