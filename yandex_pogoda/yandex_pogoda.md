@@ -31,7 +31,7 @@
     *   **HTTP Method:** `GET`
 *   **Custom Headers** *(Add headers for authentication)*
     *   **Header name:** `Authorization`
-    *   **Header value:** `Bearer ВАШ_ТОКЕН`
+    *   **Header value:** `Bearer ВАШ_ТОКЕН_HA`
 
 **Источник 2 (Основной, Yandex Pogoda):**
 *   **Basic Information**
@@ -42,7 +42,7 @@
     *   **HTTP Method:** `GET`
 *   **Custom Headers** *(Add headers for authentication)*
     *   **Header name:** `Authorization`
-    *   **Header value:** `Bearer ВАШ_ТОКЕН`
+    *   **Header value:** `Bearer ВАШ_ТОКЕН_HA`
 ---
 
 ## 3. Настройка Home Assistant (Создание сенсора)
