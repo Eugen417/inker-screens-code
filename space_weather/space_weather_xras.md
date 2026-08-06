@@ -117,6 +117,7 @@ template:
     *   **Header value:** `Bearer ВАШ_ТОКЕН_HA`
 
 
+### Способ Б: В ручную
 
 ## 1. Источник данных (Data Source)
 
