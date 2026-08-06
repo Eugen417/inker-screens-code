@@ -43,18 +43,22 @@ template:
 
 ## 3. Ручное добавление виджетов (Библиотека)
 
-Для каждого виджета из списка ниже необходимо применять **общие базовые настройки**:
+Для каждого виджета из списка ниже необходимо применять **общие базовые настройки** (если не указано иное):
 *   **Data Source:** `HA Yandex Pogoda`
 *   **Choose Display Type:** `Grid`
-*   **Field:** `не влияет на наши виджеты но к заполнению обязательно, ниже указаны для каждого виджета`
+*   **Field:** `не влияет на наши виджеты, но к заполнению обязательно, ниже указаны для каждого виджета`
 *   **Display As:** `Image` *(Обязательно для корректного отображения SVG-графики!)*
 *   **Grid Settings:** Columns: `1`, Rows: `1`
 
-Для каждого виджета перейдите в настройки ячейки (**Cell 0, 0**), оставьте поле **Field** пустым (или укажите `state` для компаса) и вставьте соответствующий код в блок **JavaScript Code**.
+Для каждого виджета перейдите в настройки ячейки (**Cell 0, 0**) и вставьте соответствующий код в блок **JavaScript Code**.
 
-### 📌 Виджет: ЯП Направление и скорость ветра компас
+---
 
+### 📌 Виджет 1: ЯП Направление и скорость ветра компас
 *   **Field:** `attributes.wind_bearing`
+
+<details>
+<summary><b>Показать код виджета (JavaScript)</b></summary>
 
 ```javascript
 // 1. Берем градусы и скорость
@@ -112,11 +116,16 @@ let svg = `
 
 return "data:image/svg+xml;charset=utf-8," + encodeURIComponent(svg.replace(/\n\s*/g, ''));
 ```
+</details>
 
-### 📌 Виджет: ЯП График температуры на 12 часов
-*(Примечание: скрипт автоматически обрабатывает 24 часа для лучшей визуализации)*
+---
 
+### 📌 Виджет 2: ЯП График температуры на 12 часов
+*(Примечание: скрипт автоматически обрабатывает прогноз на 24 часа для плавной визуализации)*
 *   **Field:** `attributes.forecast_hourly`
+
+<details>
+<summary><b>Показать код виджета (JavaScript)</b></summary>
 
 ```javascript
 // 1. Берем РЕАЛЬНЫЕ данные
@@ -126,14 +135,14 @@ if (!forecast || !Array.isArray(forecast) || forecast.length < 24) {
   return "data:image/svg+xml;charset=utf-8," + encodeURIComponent(`<svg xmlns="[http://www.w3.org/2000/svg](http://www.w3.org/2000/svg)" width="1000" height="180"><text x="10" y="30" fill="red">ОШИБКА: Нет данных на 24 часа</text></svg>`);
 }
 
-// 2. БЕРЕМ 24 ЧАСА (вместо 12)
+// 2. БЕРЕМ 24 ЧАСА
 let data = forecast.slice(0, 24);
 let temps = data.map(d => d.native_temperature);
 let minT = Math.min(...temps);
 let maxT = Math.max(...temps);
 let range = maxT - minT || 1;
 
-// 3. Настройки размеров (Увеличили ширину w до 1200, чтобы иконкам было не тесно)
+// 3. Настройки размеров
 let w = 1200; 
 let h = 180; 
 let padTop = 60;
@@ -195,10 +204,15 @@ let svg = `
 
 return "data:image/svg+xml;charset=utf-8," + encodeURIComponent(svg.replace(/\n\s*/g, ''));
 ```
+</details>
 
-### 📌 Виджет: ЯП График сила и направление ветра на 12 ч
+---
 
+### 📌 Виджет 3: ЯП График сила и направление ветра на 12 ч
 *   **Field:** `attributes.forecast_hourly`
+
+<details>
+<summary><b>Показать код виджета (JavaScript)</b></summary>
 
 ```javascript
 // 1. Берем РЕАЛЬНЫЕ данные
@@ -266,10 +280,15 @@ let svg = `
 
 return "data:image/svg+xml;charset=utf-8," + encodeURIComponent(svg.replace(/\n\s*/g, ''));
 ```
+</details>
 
-### 📌 Виджет: ЯП Прогноз на завтра
+---
 
+### 📌 Виджет 4: ЯП Прогноз на завтра
 *   **Field:** `entity_id`
+
+<details>
+<summary><b>Показать код виджета (JavaScript)</b></summary>
 
 ```javascript
 // 1. Берем РЕАЛЬНЫЕ данные
@@ -369,10 +388,15 @@ let svg = `
 
 return "data:image/svg+xml;charset=utf-8," + encodeURIComponent(svg.replace(/\n\s*/g, ''));
 ```
+</details>
 
-### 📌 Виджет: ЯП Ощущаемая и Мин/Макс
+---
 
+### 📌 Виджет 5: ЯП Ощущаемая и Мин/Макс
 *   **Field:** `entity_id`
+
+<details>
+<summary><b>Показать код виджета (JavaScript)</b></summary>
 
 ```javascript
 // 1. Берем данные из главного погодного сенсора
@@ -446,8 +470,15 @@ let svg = `
 
 return "data:image/svg+xml;charset=utf-8," + encodeURIComponent(svg.replace(/\n\s*/g, ''));
 ```
+</details>
 
-### 📌 Виджет: ЯП Прогноз на два дня краткий
+---
+
+### 📌 Виджет 6: ЯП Прогноз на два дня краткий
+*   **Field:** `entity_id`
+
+<details>
+<summary><b>Показать код виджета (JavaScript)</b></summary>
 
 ```javascript
 // 1. ПРОГНОЗ НА 2 ДНЯ (Берем только дневные)
@@ -510,14 +541,20 @@ let svg = `
 
 return "data:image/svg+xml;charset=utf-8," + encodeURIComponent(svg.replace(/\n\s*/g, ''));
 ```
-### 📌 Виджет: ЯП Сегодня основной
-> **Внимание:** Для этого виджета используется вспомогательный сенсор!
+</details>
+
+---
+
+### 📌 Виджет 7: ЯП Сегодня основной
+> **Внимание:** Для этого виджета используется **основной источник данных**, а не вспомогательный сенсор!
 *   **Data Source:** `HA Yandex Pogoda E-Paper`
 *   **Choose Display Type:** `Grid`
+*   **Field:** `entity_id`
 *   **Display As:** `Image`
 *   **Grid Settings:** Columns: `1`, Rows: `1`
 
-*  **Field:** `entity_id`
+<details>
+<summary><b>Показать код виджета (JavaScript)</b></summary>
 
 ```javascript
 try {
@@ -679,3 +716,4 @@ try {
   return "data:image/svg+xml;charset=utf-8," + encodeURIComponent(`<svg width="300" height="180"><text y="20" font-family="Arial" font-size="14" fill="#000">Ошибка: ${err.message}</text></svg>`);
 }
 ```
+</details>
