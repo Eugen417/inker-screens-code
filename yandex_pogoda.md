@@ -11,10 +11,10 @@
 
 1. **Основной источник (Yandex Pogoda):**
    * **Name:** `HA Yandex Pogoda E-Paper`
-   * **Connection URL:** `http://homeassistant.loc:8123/api/states/weather.yandex_pogoda`
+   * **Connection URL:** `http://homeassistant.local:8123/api/states/weather.yandex_pogoda`
 2. **Вспомогательный источник (Сенсор виджета):**
    * **Name:** `HA Yandex Pogoda`
-   * **Connection URL:** `http://homeassistant.loc:8123/api/states/sensor.eink_weather_widget`
+   * **Connection URL:** `http://homeassistant.local:8123/api/states/sensor.eink_weather_widget`
 
 > **Важно:** После добавления источников в Inker, перейдите в раздел **Custom Headers** (Add headers for authentication or custom requirements) и добавьте свой Long-Lived Access Token для авторизации в Home Assistant.  
 > Формат ввода: `Authorization: Bearer ВАШ_ТОКЕН`
