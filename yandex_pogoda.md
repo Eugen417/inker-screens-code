@@ -1,5 +1,8 @@
 # Погодный информер для Inker (Home Assistant + Yandex Pogoda)
 
+<img width="1512" height="827" alt="Снимок экрана — 2026-08-06 в 11 19 23" src="https://github.com/user-attachments/assets/fa3cade3-76e5-4569-87c8-7337f03a3e79" />
+
+
 Краткое руководство по настройке погодного информера для дисплеев Inker с использованием интеграции Yandex Pogoda из Home Assistant (HA).
 
 ## 1. Источники данных (Data Sources)
