@@ -51,7 +51,7 @@ template:
 
 ### Способ А: Быстрый импорт (Screen Code)
 1. В Inker перейдите в раздел **Screens > Import**.
-2. Откройте файл [inker_screen.json](yp_inker_screen.json) в этом репозитории, скопируйте его содержимое целиком и нажмите **Import Screen**.
+2. Откройте файл [yp_inker_screen.json](yp_inker_screen.json) в этом репозитории, скопируйте его содержимое целиком и нажмите **Import Screen**.
 3. После импорта обязательно зайдите в раздел Data Sources, внесите изменения в:
 
 **Источник 1 (Основной, Yandex Pogoda):** удалите и добавьте свои данные
