@@ -1,27 +1,50 @@
 # Погодный информер для Inker (Home Assistant + Yandex Pogoda)
 
-<img width="1511" height="826" alt="Снимок экрана — 2026-08-06 в 11 46 50" src="https://github.com/user-attachments/assets/fdaab4b7-3c7b-48ec-b234-8bfda30131e9" />
-
+<img width="1511" height="826" alt="Снимок экрана — 2026-08-06 в 11 46 50" src="https://github.com/user-attachments/assets/fdaab4b7-3c7b-48ec-b234-8bfda30131e9" />
 
 Краткое руководство по настройке погодного информера для дисплеев Inker с использованием интеграции Yandex Pogoda из Home Assistant (HA).
 
-## 1. Источники данных (Data Sources)
+## 1. Способы установки
 
-Для работы информера в Inker необходимо создать два источника данных:
+Установить информер можно двумя способами:
 
-1. **Основной источник (Yandex Pogoda):**
-   * **Name:** `HA Yandex Pogoda`
-   * **Connection URL:** `http://homeassistant.local:8123/api/states/weather.yandex_pogoda`
-2. **Вспомогательный источник (Сенсор виджета):**
-   * **Name:** `HA Yandex Pogoda E-Paper`
-   * **Connection URL:** `http://homeassistant.local:8123/api/states/sensor.eink_weather_widget`
+### Способ А: Быстрый импорт (Screen Code)
+1. В Inker перейдите в раздел **Screens > Import**.
+2. Вставьте установочный код (Screen Code) и нажмите **Import Screen**.
+3. После импорта обязательно зайдите в раздел Data Sources, чтобы поправить URL-адреса (на ваши локальные) и прописать токен в Custom Headers.
 
-> **Важно:** После добавления источников в Inker, перейдите в раздел **Custom Headers** (Add headers for authentication or custom requirements) и добавьте свой Long-Lived Access Token для авторизации в Home Assistant.  
-> Формат ввода: `Authorization: Bearer ВАШ_ТОКЕН`
+### Способ Б: Ручная настройка
+Если вы хотите собрать экран с нуля, сначала необходимо добавить два источника данных в разделе **Data Sources**, а затем вручную расставить виджеты (см. пункт 4).
 
 ---
 
-## 2. Настройка Home Assistant (Создание сенсора)
+## 2. Источники данных (Data Sources)
+
+Для ручной настройки (Способ Б) создайте два источника со следующими параметрами:
+
+**Источник 1 (Вспомогательный сенсор виджета):**
+*   **Basic Information**
+    *   **Name:** `HA Yandex Pogoda E-Paper`
+    *   **Type:** `JSON API`
+*   **Connection**
+    *   **URL:** `http://homeassistant.local:8123/api/states/sensor.eink_weather_widget`
+    *   **HTTP Method:** `GET`
+*   **Custom Headers** *(Add headers for authentication)*
+    *   **Authorization:** `Bearer ВАШ_ТОКЕН`
+
+**Источник 2 (Основной, Yandex Pogoda):**
+*   **Basic Information**
+    *   **Name:** `HA Yandex Pogoda`
+    *   **Type:** `JSON API`
+*   **Connection**
+    *   **URL:** `http://homeassistant.local:8123/api/states/weather.yandex_pogoda`
+    *   **HTTP Method:** `GET`
+*   **Custom Headers** *(Add headers for authentication)*
+    *   **Authorization:** `Bearer ВАШ_ТОКЕН`
+
+---
+
+## 3. Настройка Home Assistant (Создание сенсора)
 
 Вспомогательный сенсор собирает необходимые атрибуты для вывода на экран. Добавьте следующий код в конфигурацию HA (в раздел `packages` или `template`):
 
@@ -44,10 +67,10 @@ template:
 
 ---
 
-## 3. Ручное добавление виджетов (Библиотека)
+## 4. Ручное добавление виджетов (Библиотека)
 
 Для каждого виджета из списка ниже необходимо применять **общие базовые настройки** (если не указано иное):
-*   **Data Source:** `HA Yandex Pogoda`
+*   **Data Source:** `HA Yandex Pogoda E-Paper` *(или `HA Yandex Pogoda` — см. указания к виджету)*
 *   **Choose Display Type:** `Grid`
 *   **Field:** `не влияет на наши виджеты, но к заполнению обязательно, ниже указаны для каждого виджета`
 *   **Display As:** `Image` *(Обязательно для корректного отображения SVG-графики!)*
@@ -58,6 +81,7 @@ template:
 ---
 
 ### 📌 Виджет 1: ЯП Направление и скорость ветра компас
+*   **Data Source:** `HA Yandex Pogoda E-Paper`
 *   **Field:** `attributes.wind_bearing`
 
 <details>
@@ -125,6 +149,7 @@ return "data:image/svg+xml;charset=utf-8," + encodeURIComponent(svg.replace(/\n\
 
 ### 📌 Виджет 2: ЯП График температуры на 12 часов
 *(Примечание: скрипт автоматически обрабатывает прогноз на 24 часа для плавной визуализации)*
+*   **Data Source:** `HA Yandex Pogoda E-Paper`
 *   **Field:** `attributes.forecast_hourly`
 
 <details>
@@ -212,6 +237,7 @@ return "data:image/svg+xml;charset=utf-8," + encodeURIComponent(svg.replace(/\n\
 ---
 
 ### 📌 Виджет 3: ЯП График сила и направление ветра на 12 ч
+*   **Data Source:** `HA Yandex Pogoda E-Paper`
 *   **Field:** `attributes.forecast_hourly`
 
 <details>
@@ -288,6 +314,7 @@ return "data:image/svg+xml;charset=utf-8," + encodeURIComponent(svg.replace(/\n\
 ---
 
 ### 📌 Виджет 4: ЯП Прогноз на завтра
+*   **Data Source:** `HA Yandex Pogoda E-Paper`
 *   **Field:** `entity_id`
 
 <details>
@@ -396,6 +423,7 @@ return "data:image/svg+xml;charset=utf-8," + encodeURIComponent(svg.replace(/\n\
 ---
 
 ### 📌 Виджет 5: ЯП Ощущаемая и Мин/Макс
+*   **Data Source:** `HA Yandex Pogoda E-Paper`
 *   **Field:** `entity_id`
 
 <details>
@@ -478,6 +506,7 @@ return "data:image/svg+xml;charset=utf-8," + encodeURIComponent(svg.replace(/\n\
 ---
 
 ### 📌 Виджет 6: ЯП Прогноз на два дня краткий
+*   **Data Source:** `HA Yandex Pogoda E-Paper`
 *   **Field:** `entity_id`
 
 <details>
@@ -549,12 +578,9 @@ return "data:image/svg+xml;charset=utf-8," + encodeURIComponent(svg.replace(/\n\
 ---
 
 ### 📌 Виджет 7: ЯП Сегодня основной
-> **Внимание:** Для этого виджета используется **основной источник данных**, а не вспомогательный сенсор!
-*   **Data Source:** `HA Yandex Pogoda E-Paper`
-*   **Choose Display Type:** `Grid`
+> **Внимание:** Для этого виджета необходимо переключить **Data Source** на основной источник интеграции!
+*   **Data Source:** `HA Yandex Pogoda`
 *   **Field:** `entity_id`
-*   **Display As:** `Image`
-*   **Grid Settings:** Columns: `1`, Rows: `1`
 
 <details>
 <summary><b>Показать код виджета (JavaScript)</b></summary>
