@@ -103,6 +103,20 @@ template:
 > **Проверка:** После перезагрузки шаблонов (или перезапуска HA) зайдите в *Панель разработчика > Состояния* и убедитесь, что `sensor.eink_full_space_weather` существует и содержит все массивы в формате JSON (например, `forecast_3d_array` не равен null).
 
 ---
+## Установка
+### Способ А: Быстрый импорт (Screen Code)
+1. В Inker перейдите в раздел **Screens > Import**.
+2. Откройте файл [sw_inker_screen.json](sw_inker_screen.json) в этом репозитории, скопируйте его содержимое целиком и нажмите **Import Screen**.
+3. После импорта обязательно зайдите в раздел Data Sources, внесите изменения в:
+*   **Basic Information**
+    *   **Name:** `HA Space Weather`
+*   **Connection**
+    *   **URL:** `http://homeassistant.local:8123/api/states/sensor.eink_full_space_weather` проверьте ссылку
+*   **Custom Headers** *(Add headers for authentication)*
+    *   **Header name:** `Authorization`
+    *   **Header value:** `Bearer ВАШ_ТОКЕН_HA`
+
+
 
 ## 1. Источник данных (Data Source)
 
