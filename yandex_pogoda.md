@@ -18,3 +18,6 @@ template:
           next_rising: "{{ state_attr('sun.sun', 'next_rising') }}"
           next_setting: "{{ state_attr('sun.sun', 'next_setting') }}"
 ```
+Перед установкой виджета в Inker проверить в HA в разделе Инструментарий > Состояние наличие `weather.yandex_pogoda` и `sensor.eink_weather_widget`
+Для установки в Inker можно воспользоваться установочным кодом
+После установки нкжно будетвнести изменеия в источниках в пунктах Custom Headers (Add headers for authentication or custom requirements) добавить свои данные Токен для подключения к HA.
