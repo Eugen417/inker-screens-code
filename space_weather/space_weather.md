@@ -146,7 +146,7 @@ template:
 
 ---
 
-### 📌 Виджет 1: Магнитные бури (График на 24 часа)
+### 📌 Виджет 1: КП МАГРИТНЫЕ БУРИ на 24ч
 
 Отображает 8 трехчасовых столбиков за последние сутки с умным округлением и выделением магнитных бурь.
 
@@ -155,16 +155,21 @@ try {
   let src = typeof $ === 'string' ? JSON.parse($) : $;
   let attr = src.attributes || {};
   
+  // Текущее значение нам нужно только для последнего столбика "сейч"
   let kpCurrent = parseFloat(attr.kp_current || 0);
 
+  // Форматирование значений (например, 1.33 -> 1+, 1.67 -> 2-)
   let formatKp = (v) => {
     let base = Math.round(v), diff = v - base;
     if (Math.abs(diff) < 0.2) return base.toString(); 
     return diff > 0 ? base + "+" : base + "-";
   };
 
+  // 1. СНАЧАЛА ИЗВЛЕКАЕМ ИСТОРИЮ 24 ЧАСОВ
   let history3d = [];
-  try { history3d = typeof attr.history_3d === 'string' ? JSON.parse(attr.history_3d) : attr.history_3d; } catch(e) {}
+  try { 
+      history3d = typeof attr.history_3d === 'string' ? JSON.parse(attr.history_3d) : attr.history_3d; 
+  } catch(e) {}
   
   let flatData = [];
   if (history3d && history3d.length > 0) {
@@ -173,32 +178,47 @@ try {
       history3d.forEach(day => {
           hoursList.forEach(hour => {
               if (day[hour] !== null && day[hour] !== 'null' && day[hour] !== undefined) {
-                  flatData.push({ val: parseFloat(day[hour]), startHour: parseInt(hour.substring(1)) });
+                  flatData.push({ 
+                      val: parseFloat(day[hour]), 
+                      startHour: parseInt(hour.substring(1)) 
+                  });
               }
           });
       });
   }
   
+  // Берем последние 8 интервалов
   let barsData = flatData.slice(-8);
   while (barsData.length < 8) {
       let lastStart = barsData.length > 0 ? barsData[0].startHour : 3;
       barsData.unshift({ val: 0, startHour: (lastStart - 3 + 24) % 24 });
   }
   
-  if (attr.kp_current !== undefined && attr.kp_current !== null) barsData[7].val = kpCurrent; 
+  // Актуализируем текущий (последний) блок самым свежим Kp
+  if (attr.kp_current !== undefined && attr.kp_current !== null) {
+      barsData[7].val = kpCurrent; 
+  }
 
+  // ==========================================
+  // 2. УМНАЯ ЛОГИКА: НАХОДИМ МАКСИМУМ ЗА СУТКИ
+  // ==========================================
   let maxKp = Math.max(...barsData.map(b => b.val));
   if (isNaN(maxKp)) maxKp = 0;
   
+  // Статус активности теперь зависит от МАКСИМАЛЬНОГО значения
   let statusText = "Спокойная обстановка";
   if (maxKp >= 4 && maxKp < 5) statusText = "Возмущенное поле";
   else if (maxKp >= 5) statusText = "Магнитная буря";
 
+  // Прогресс-бар теперь рисуется по МАКСИМАЛЬНОМУ значению
   let pBarWidth = Math.max(Math.min((maxKp / 9) * 236, 236), 0);
   if (maxKp > 0 && pBarWidth < 6) pBarWidth = 6;
 
+  // 3. ОТРИСОВКА ГРАФИКА
   let timeLabels = [];
-  for(let i = 0; i < 8; i++) timeLabels.push(String(barsData[i].startHour).padStart(2, '0'));
+  for(let i = 0; i < 8; i++) {
+      timeLabels.push(String(barsData[i].startHour).padStart(2, '0'));
+  }
   let lastHour = barsData[7].startHour;
   if(isNaN(lastHour)) lastHour = 0;
   timeLabels.push(String((lastHour + 3) % 24).padStart(2, '0')); 
@@ -224,13 +244,19 @@ try {
     if (val >= 5) fill = "#000";    
     else if (val >= 4) fill = "#999"; 
 
-    barsSvg += `<rect x="${x}" y="${y}" width="${barWidth}" height="${h}" fill="${fill}" stroke="#000" stroke-width="2" rx="3"/>`;
+    let stroke = "#000"; 
+    let strokeW = "2";   
+
+    barsSvg += `<rect x="${x}" y="${y}" width="${barWidth}" height="${h}" fill="${fill}" stroke="${stroke}" stroke-width="${strokeW}" rx="3"/>`;
     
+    // --- ИСПРАВЛЕННАЯ ЛОГИКА ВЫВОДА ЗНАЧЕНИЙ ---
     let displayVal = "-";
     if (val !== undefined && val !== null && !isNaN(val)) {
         displayVal = formatKp(val);
+        // Если значение ровно 0, принудительно оставляем красивый чистый 0 (без плюсов/минусов)
         if (displayVal === "0" && val === 0) displayVal = "0"; 
     }
+    // ------------------------------------------
 
     valuesSvg += `<text x="${cx}" y="142" font-size="13" fill="#000" text-anchor="middle" font-family="Arial" font-weight="bold">${displayVal}</text>`;
 
@@ -243,23 +269,31 @@ try {
   let svg = `
   <svg xmlns="http://www.w3.org/2000/svg" width="260" height="210" viewBox="0 0 260 210">
     <style>.t { font-family: Arial, sans-serif; fill: #000; font-weight: bold; } .s { font-family: Arial, sans-serif; fill: #555; font-weight: bold; }</style>
+    
     <text x="10" y="20" font-size="16" class="t" letter-spacing="1">МАГНИТНЫЕ БУРИ 24 Ч</text>
     <line x1="10" y1="28" x2="250" y2="28" stroke="#000" stroke-width="3" stroke-linecap="round"/>
+    
     <text x="10" y="64" font-size="42" class="t">Kp ${formatKp(maxKp)}</text>
     <text x="10" y="82" font-size="14" class="t">${statusText}</text>
+    
     <rect x="10" y="94" width="240" height="14" rx="7" fill="none" stroke="#000" stroke-width="2"/>
     <rect x="12" y="96" width="${pBarWidth}" height="10" rx="5" fill="#000"/>
-    ${axisSvg}${valuesSvg}${barsSvg}
+    
+    ${axisSvg}
+    ${valuesSvg}
+    ${barsSvg}
   </svg>`;
   
   return "data:image/svg+xml;charset=utf-8," + encodeURIComponent(svg.replace(/\n\s*/g, ''));
-} catch (err) { return "data:image/svg+xml;charset=utf-8," + encodeURIComponent(`<svg width="260" height="210"><text y="20">Ошибка: ${err.message}</text></svg>`); }
+} catch (err) { 
+  return "data:image/svg+xml;charset=utf-8," + encodeURIComponent(`<svg width="260" height="210"><text y="20">Ошибка: ${err.message}</text></svg>`); 
+}
 
 ```
 
 ---
 
-### 📌 Виджет 2: Прогноз магнитных бурь на 2 дня
+### 📌 Виджет 2: КП ПРОГНОЗ БУРЬ  на 2 дня
 
 Показывает ожидаемый максимальный индекс (Kp) на ближайшие 24 часа вперед.
 
@@ -268,26 +302,37 @@ try {
   let src = typeof $ === 'string' ? JSON.parse($) : $;
   let attr = src.attributes || {};
   
+  // БЕРЕМ РЕАЛЬНОЕ ВРЕМЯ (СЕЙЧАС)
   let now = new Date();
   let currentTs = now.getTime();
-  let endTs = currentTs + (24 * 60 * 60 * 1000); 
+  let endTs = currentTs + (24 * 60 * 60 * 1000); // Ровно +24 часа от сейчас
   
   let maxKp24 = 0;
+  
+  // Распаковываем массив прогноза на 3 дня (который мы добавили в HA)
   let forecastArr = [];
   try {
-      if (typeof attr.forecast_3d_array === 'string') forecastArr = JSON.parse(attr.forecast_3d_array);
-      else if (Array.isArray(attr.forecast_3d_array)) forecastArr = attr.forecast_3d_array;
+      if (typeof attr.forecast_3d_array === 'string') {
+          forecastArr = JSON.parse(attr.forecast_3d_array);
+      } else if (Array.isArray(attr.forecast_3d_array)) {
+          forecastArr = attr.forecast_3d_array;
+      }
   } catch(e) {}
   
   if (forecastArr && forecastArr.length > 0) {
     let futureVals = [];
     const hourKeys = ['h00', 'h03', 'h06', 'h09', 'h12', 'h15', 'h18', 'h21'];
     
+    // Перебираем дни и часы прогноза
     forecastArr.forEach(day => {
       let dayStr = day.time; 
       hourKeys.forEach(hk => {
+         // Собираем точное время каждого 3-часового блока прогноза
          let blockTime = new Date(`${dayStr}T${hk.replace('h', '')}:00:00`);
          let blockTs = blockTime.getTime();
+         
+         // ФИЛЬТР: Берем только те блоки, которые попадают в окно "от сейчас до +24 часа"
+         // (сдвигаем старт на 3 часа назад, чтобы захватить текущий идущий блок)
          if (blockTs > currentTs - (3 * 3600 * 1000) && blockTs <= endTs) {
             let val = parseFloat(day[hk]);
             if (!isNaN(val)) futureVals.push(val);
@@ -295,24 +340,33 @@ try {
       });
     });
     
-    if (futureVals.length > 0) maxKp24 = Math.max(...futureVals);
-    else maxKp24 = parseFloat(attr.kp_today || 0); 
+    // Находим максимальный прогноз в этом окне
+    if (futureVals.length > 0) {
+      maxKp24 = Math.max(...futureVals);
+    } else {
+      maxKp24 = parseFloat(attr.kp_today || 0); // фолбек
+    }
   } else {
+     // Если массива нет, используем фолбек
      maxKp24 = parseFloat(attr.kp_today || 0);
   }
   
+  // Умное форматирование Kp (1.33 -> 1+, 1.67 -> 2-)
   let formatKp = (v) => {
     let base = Math.round(v), diff = v - base;
     if (Math.abs(diff) < 0.2) return base.toString(); 
     return diff > 0 ? base + "+" : base + "-";
   };
 
+  // ФОРМИРУЕМ ДАТЫ ДЛЯ ПОДПИСЕЙ ГРАФИКОВ
   let d = new Date();
   const months = ['января', 'февраля', 'марта', 'апреля', 'мая', 'июня', 'июля', 'августа', 'сентября', 'октября', 'ноября', 'декабря'];
+  
   let date1 = d.getDate() + " " + months[d.getMonth()];
   d.setDate(d.getDate() + 1);
   let date2 = d.getDate() + " " + months[d.getMonth()];
 
+  // ПАРСИНГ ВЕРОЯТНОСТЕЙ 
   let parseProb = (val, defaultArr) => {
       if (!val || val === "null" || val === "unknown") return defaultArr;
       if (Array.isArray(val)) return val;
@@ -320,11 +374,13 @@ try {
           let parsed = typeof val === 'string' ? JSON.parse(val) : val;
           if (typeof parsed === 'string') parsed = JSON.parse(parsed);
           return (Array.isArray(parsed) && parsed.length >= 3) ? parsed : defaultArr;
-      } catch(e) { return defaultArr; }
+      } catch(e) {
+          return defaultArr;
+      }
   };
 
-  let p1 = parseProb(attr.prob_today || attr.storm_prob_today, [0, 0, 0]); 
-  let p2 = parseProb(attr.prob_tomorrow || attr.storm_prob_tomorrow, [0, 0, 0]); 
+  let p1 = parseProb(attr.storm_prob_today, [0, 0, 0]); 
+  let p2 = parseProb(attr.storm_prob_tomorrow, [0, 0, 0]); 
 
   let drawBars = (x, data, label) => {
     let h0 = Math.max(((data[0] || 0) / 100) * 40, 4);
@@ -349,23 +405,29 @@ try {
   let svg = `
   <svg xmlns="http://www.w3.org/2000/svg" width="260" height="210" viewBox="0 0 260 210">
     <style>.t { font-family: Arial, sans-serif; fill: #000; font-weight: bold; }</style>
+    
     <text x="10" y="20" font-size="15" class="t" letter-spacing="1">ПРОГНОЗ БУРЬ НА 2 ДН.</text>
     <line x1="10" y1="28" x2="250" y2="28" stroke="#000" stroke-width="3" stroke-linecap="round"/>
+    
     <text x="10" y="75" font-size="46" class="t">Kp ${formatKp(maxKp24)}</text>
     <text x="10" y="95" font-size="12" class="t">Макс. на 24 ч вперёд</text>
+    
     <text x="130" y="115" font-size="11" class="t" text-anchor="middle">ВЕРОЯТНОСТИ БУРЬ, %</text>
+    
     ${drawBars(65, p1, date1)}
     ${drawBars(195, p2, date2)}
   </svg>`;
   
   return "data:image/svg+xml;charset=utf-8," + encodeURIComponent(svg.replace(/\n\s*/g, ''));
-} catch (err) { return "data:image/svg+xml;charset=utf-8," + encodeURIComponent(`<svg width="260" height="210"><text y="20">Ошибка: ${err.message}</text></svg>`); }
+} catch (err) { 
+  return "data:image/svg+xml;charset=utf-8," + encodeURIComponent(`<svg width="260" height="210"><text y="20">Ошибка: ${err.message}</text></svg>`); 
+}
 
 ```
 
 ---
 
-### 📌 Виджет 3: Полярные сияния (Линейный график)
+### 📌 Виджет 3: КП ПОЛЯРНЫЕ СИЯНИЯ
 
 Отображает вероятность и индекс АИ (Северного полушария) в виде динамического линейного графика за 24 часа.
 
@@ -385,6 +447,7 @@ try {
   let pBarWidth = Math.max(Math.min((auroraProb / 100) * 110, 110), 0);
   let iBarWidth = Math.max(Math.min((auroraIndex / 10) * 110, 110), 0);
 
+  // --- ПОСТРОЕНИЕ ГРАФИКА (ЛИНИЯ) ---
   let chartHtml = "";
   let aurHist = [];
   try {
@@ -395,12 +458,15 @@ try {
   } catch(e) {}
 
   if (aurHist.length > 0) {
+      // Сортируем от старых к новым (слева направо)
       aurHist.sort((a, b) => new Date(a.time) - new Date(b.time));
       
+      // ФИЛЬТР НА 24 ЧАСА
       let newestTs = new Date(aurHist[aurHist.length - 1].time).getTime();
       let cutoffTs = newestTs - (24 * 60 * 60 * 1000); 
       aurHist = aurHist.filter(pt => new Date(pt.time).getTime() >= cutoffTs);
 
+      // ВЫЧИСЛЯЕМ ДИНАМИЧЕСКИЙ МАКСИМУМ
       let maxVal = 0;
       aurHist.forEach(pt => {
           let v = parseFloat(pt.n_ai);
@@ -411,18 +477,22 @@ try {
       if (maxAi - maxVal < 0.2) maxAi += 1; 
 
       let chartX = 10;
-      let chartY = 205; 
-      let chartW = 225; 
-      let chartH = 45;  
+      let chartY = 205; // Базовая линия (низ графика)
+      let chartW = 225; // Ширина
+      let chartH = 45;  // Высота графического поля
 
+      // 1. Опасная зона
       if (maxAi >= 5) {
           let dangerY = chartY - (5 / maxAi) * chartH;
-          let topDangerH = chartH - (chartY - dangerY); 
+          let dangerH = chartY - dangerY; 
+          let topDangerH = chartH - dangerH; 
+          
           chartHtml += `<rect x="${chartX}" y="${chartY - chartH}" width="${chartW}" height="${topDangerH}" fill="url(#stripes)" />`;
           chartHtml += `<line x1="${chartX}" y1="${dangerY}" x2="${chartX + chartW}" y2="${dangerY}" stroke="#000" stroke-dasharray="2,2" stroke-width="1.5"/>`; 
           chartHtml += `<text x="${chartX + chartW + 4}" y="${dangerY + 3}" font-size="10" class="t">5</text>`;
       }
 
+      // 2. Формируем ЛИНИЮ графика
       let pathD = "";
       let stepX = chartW / Math.max(1, aurHist.length - 1);
       
@@ -433,12 +503,20 @@ try {
           let x = chartX + i * stepX;
           let y = chartY - h;
           
-          if (i === 0) pathD += `M ${x.toFixed(1)},${y.toFixed(1)} `;
-          else pathD += `L ${x.toFixed(1)},${y.toFixed(1)} `;
+          if (i === 0) {
+              pathD += `M ${x.toFixed(1)},${y.toFixed(1)} `; // Ставим начальную точку
+          } else {
+              pathD += `L ${x.toFixed(1)},${y.toFixed(1)} `; // Рисуем линию к следующей
+          }
       });
 
+      // 3. Отрисовка линии (без заливки)
       chartHtml += `<path d="${pathD}" fill="none" stroke="#000" stroke-width="3" stroke-linejoin="round" />`;
+
+      // 4. Ось X (низ)
       chartHtml += `<line x1="${chartX}" y1="${chartY}" x2="${chartX + chartW}" y2="${chartY}" stroke="#000" stroke-width="2"/>`; 
+
+      // 5. Подпись самого верха шкалы
       chartHtml += `<text x="${chartX + chartW + 4}" y="${chartY - chartH + 4}" font-size="10" class="t">${maxAi}</text>`;
   } else {
       chartHtml = `<text x="130" y="180" font-size="12" class="s" fill="#666" text-anchor="middle">Нет данных для графика</text>`;
@@ -456,6 +534,7 @@ try {
       .s { font-family: Arial, sans-serif; fill: #000; font-weight: bold; }
       .l { font-family: Arial, sans-serif; fill: #000; font-size: 10px; }
     </style>
+    
     <text x="10" y="20" font-size="16" class="t" letter-spacing="1">ПОЛЯРНЫЕ СИЯНИЯ</text>
     <line x1="10" y1="28" x2="250" y2="28" stroke="#000" stroke-width="3" stroke-linecap="round"/>
 
@@ -475,17 +554,20 @@ try {
     <text x="249" y="142" class="l" text-anchor="end">10</text>
 
     ${chartHtml}
+
     <text x="130" y="232" font-size="14" class="t" text-anchor="middle">${statusText}</text>
   </svg>`;
   
   return "data:image/svg+xml;charset=utf-8," + encodeURIComponent(svg.replace(/\n\s*/g, ''));
-} catch (err) { return "data:image/svg+xml;charset=utf-8," + encodeURIComponent(`<svg width="260" height="240"><text y="20">Ошибка: ${err.message}</text></svg>`); }
+} catch (err) { 
+  return "data:image/svg+xml;charset=utf-8," + encodeURIComponent(`<svg width="260" height="240"><text y="20">Ошибка: ${err.message}</text></svg>`); 
+}
 
 ```
 
 ---
 
-### 📌 Виджет 4: Солнечные вспышки
+### 📌 Виджет 4: КП СОЛНЕЧНЫЕ ВСПЫШКИ
 
 Выводит текущий индекс вспышечной активности и таблицу последних 5 вспышек с указанием класса, времени и области.
 
@@ -494,22 +576,27 @@ try {
   let src = typeof $ === 'string' ? JSON.parse($) : $;
   let attr = src.attributes || {};
 
+  // 1. ИСПРАВЛЕНО: Извлекаем индекс. Если это 0, он честно выведет 0.0
   let fIndex = (attr.flare_index !== undefined && attr.flare_index !== null && attr.flare_index !== "null") 
                 ? Number(attr.flare_index).toFixed(1) 
                 : "—";
 
+  // Берем статус из атрибута или из основного состояния сенсора
   let statusText = attr.flare_status || src.state || "—";
   let flareSummary = attr.flare_summary || "Нет данных";
 
+  // 2. Таблица вспышек
   let flares = [];
   try {
       let raw = attr.flares_list;
       if (typeof raw === 'string') raw = JSON.parse(raw);
-      if (typeof raw === 'string') raw = JSON.parse(raw); 
+      if (typeof raw === 'string') raw = JSON.parse(raw); // иногда HA отдает двойной JSON
       if (Array.isArray(raw)) flares = raw;
   } catch(e) {}
   
-  while(flares.length < 5) flares.push({cls: "—", time: "—", reg: "—"});
+  while(flares.length < 5) {
+      flares.push({cls: "—", time: "—", reg: "—"});
+  }
   flares = flares.slice(0, 5);
 
   let rowsHtml = "";
@@ -533,6 +620,7 @@ try {
     <text x="33" y="58" font-size="16" fill="#fff" font-weight="bold" font-family="Arial" text-anchor="middle">${fIndex}</text>
 
     <text x="68" y="58" font-size="16" class="t">${statusText}</text>
+
     <text x="10" y="85" font-size="11" class="s">${flareSummary}</text>
 
     <text x="45" y="105" font-size="11" class="s" text-anchor="middle">класс</text>
@@ -543,6 +631,230 @@ try {
   </svg>`;
   
   return "data:image/svg+xml;charset=utf-8," + encodeURIComponent(svg.replace(/\n\s*/g, ''));
-} catch (err) { return "data:image/svg+xml;charset=utf-8," + encodeURIComponent(`<svg width="260" height="230"><text y="20">Ошибка: ${err.message}</text></svg>`); }
+} catch (err) { 
+  return "data:image/svg+xml;charset=utf-8," + encodeURIComponent(`<svg width="260" height="230"><text y="20">Ошибка: ${err.message}</text></svg>`); 
+}
 
 ```
+
+### 📌 Виджет 5: КП СОЛНЕЧНЫЕ ПЯТНА
+
+Выводит 
+
+```javascript
+try {
+  let src = typeof $ === 'string' ? JSON.parse($) : $;
+  let attr = src.attributes || {};
+
+  // 1. Берем общее количество пятен (если нет данных, ставим 0)
+  let spotsCount = attr.sunspots_total_groups || "0";
+
+  // 2. Распаковываем динамический список ТОП-3 пятен
+  let topSpots = [];
+  try {
+      let raw = attr.sunspots_list;
+      if (raw && raw !== "null" && raw !== "unknown" && raw !== "[]" && raw !== "\"[]\"") {
+          let parsed = raw;
+          if (typeof parsed === 'string') parsed = JSON.parse(parsed); 
+          if (typeof parsed === 'string') parsed = JSON.parse(parsed); 
+          if (Array.isArray(parsed)) {
+              topSpots = parsed;
+          }
+      }
+  } catch(e) {}
+
+  // 3. Заполняем пустоты прочерками, чтобы всегда было ровно 3 строки
+  while (topSpots.length < 3) {
+      topSpots.push({ reg: "—", area: "—", type: "—" });
+  }
+  // Строго отрезаем лишнее (оставляем только ТОП-3)
+  topSpots = topSpots.slice(0, 3);
+
+  // 4. Генерируем строки таблицы
+  let rowsHtml = "";
+  topSpots.forEach((spot, i) => {
+      let y = 120 + i * 35; 
+      
+      // УМНОЕ СОКРАЩЕНИЕ ТИПА: Beta-Delta -> BD, Beta -> B
+      let shortType = "—";
+      if (spot.type && spot.type !== "—") {
+          shortType = spot.type.split('-').map(word => word.charAt(0).toUpperCase()).join('');
+      }
+
+      rowsHtml += `<text x="130" y="${y}" font-size="14" class="t" text-anchor="middle">${spot.reg || "—"}</text>
+                   <text x="180" y="${y}" font-size="14" class="s" text-anchor="middle">${spot.area || "—"}</text>
+                   <text x="230" y="${y}" font-size="14" class="t" text-anchor="middle">${shortType}</text>`;
+  });
+
+  let svg = `
+  <svg xmlns="http://www.w3.org/2000/svg" width="260" height="210" viewBox="0 0 260 210">
+    <style>.t { font-family: Arial, sans-serif; fill: #000; font-weight: bold; } .s { font-family: Arial, sans-serif; fill: #000; font-weight: bold; }</style>
+    <text x="10" y="20" font-size="16" class="t" letter-spacing="1">СОЛНЕЧНЫЕ ПЯТНА</text>
+    <line x1="10" y1="28" x2="250" y2="28" stroke="#000" stroke-width="3" stroke-linecap="round"/>
+
+    <text x="10" y="55" font-size="11" class="s">АКТИВНЫЕ ГРУППЫ</text>
+    <text x="10" y="120" font-size="70" class="t">${spotsCount}</text>
+    <text x="10" y="145" font-size="14" class="s">областей</text>
+    
+    <text x="180" y="55" font-size="11" class="s" text-anchor="middle">ТОП 3 ОБЛАСТЕЙ</text>
+    
+    <text x="130" y="85" font-size="11" class="s" text-anchor="middle">№</text>
+    <text x="180" y="85" font-size="11" class="s" text-anchor="middle">площадь</text>
+    <text x="230" y="85" font-size="11" class="s" text-anchor="middle">тип</text>
+
+    ${rowsHtml}
+  </svg>`;
+  
+  return "data:image/svg+xml;charset=utf-8," + encodeURIComponent(svg.replace(/\n\s*/g, ''));
+} catch (err) { 
+  return "data:image/svg+xml;charset=utf-8," + encodeURIComponent(`<svg width="260" height="210"><text y="20">Ошибка: ${err.message}</text></svg>`); 
+}
+
+```
+
+### 📌 Виджет 6: КП СОЛНЕЧНЫЙ ВЕТЕР
+
+Выводит 
+
+```javascript
+try {
+  let src = typeof $ === 'string' ? JSON.parse($) : $;
+  let attr = src.attributes || {};
+
+  // УМНЫЙ ПОИСК: ищем самое свежее не-null значение в истории
+  let getLatest = (rawStr, key) => {
+      if (!rawStr) return NaN;
+      try {
+          let arr = typeof rawStr === 'string' ? JSON.parse(rawStr) : rawStr;
+          if (typeof arr === 'string') arr = JSON.parse(arr);
+          if (Array.isArray(arr)) {
+              // Сортируем от старого к новому и идем с конца массива
+              arr.sort((a, b) => a.time.localeCompare(b.time));
+              for (let i = arr.length - 1; i >= 0; i--) {
+                  let val = parseFloat(arr[i][key]);
+                  if (!isNaN(val)) return val;
+              }
+          }
+      } catch(e) {}
+      return NaN;
+  };
+
+  // Читаем state (если виджету скормили напрямую sensor.moscow_swv_current)
+  let stateVal = parseFloat(src.state);
+  
+  // 1. Скорость ветра (проверяем все возможные места)
+  let speedRaw = parseFloat(attr.swv_current);
+  if (isNaN(speedRaw)) speedRaw = stateVal; 
+  if (isNaN(speedRaw)) speedRaw = getLatest(attr.sw_history_v || attr.history, 'v');
+  let windSpeed = (!isNaN(speedRaw) && speedRaw > 0) ? Math.round(speedRaw) : 0;
+
+  // 2. Температура (ищем sw_history_t ИЛИ history_temp)
+  let tempRaw = parseFloat(attr.sw_temp);
+  if (isNaN(tempRaw)) tempRaw = getLatest(attr.sw_history_t || attr.history_temp, 't');
+  
+  let t = "—";
+  if (!isNaN(tempRaw) && tempRaw > 0) {
+      if (tempRaw >= 1000) {
+          t = Math.round(tempRaw / 1000) + "k";
+      } else {
+          t = Math.round(tempRaw).toString();
+      }
+  }
+
+  // 3. Плотность плазмы (ищем sw_history_n ИЛИ history_density)
+  let denRaw = parseFloat(attr.sw_density);
+  if (isNaN(denRaw)) denRaw = getLatest(attr.sw_history_n || attr.history_density, 'n');
+  let den = (!isNaN(denRaw) && denRaw > 0) ? denRaw.toFixed(1) : "—";
+
+  // 4. Магнитные поля Bt и Bz
+  let btRaw = parseFloat(attr.sw_bt);
+  if (isNaN(btRaw)) btRaw = getLatest(attr.sw_history_bt || attr.history_bt, 'bt');
+  let bt = (!isNaN(btRaw)) ? btRaw.toFixed(1) : "—";
+
+  let bzRaw = parseFloat(attr.sw_bz);
+  if (isNaN(bzRaw)) bzRaw = getLatest(attr.sw_history_bz || attr.history_bz, 'bz');
+  let bz = (!isNaN(bzRaw)) ? bzRaw.toFixed(1) : "—";
+
+  // 5. ГРАФИК СКОРОСТИ ВЕТРА (за час)
+  let graphSvg = "";
+  let vHistory = [];
+  try {
+      // Поддерживаем оба названия массива
+      let raw = attr.sw_history_v || attr.history; 
+      if (typeof raw === 'string') raw = JSON.parse(raw);
+      if (typeof raw === 'string') raw = JSON.parse(raw); 
+      if (Array.isArray(raw)) vHistory = raw;
+  } catch(e) {}
+
+  if (vHistory.length > 1) {
+      vHistory.sort((a, b) => a.time.localeCompare(b.time)); 
+      let vals = vHistory.map(d => parseFloat(d.v)).filter(v => !isNaN(v) && v > 0);
+      
+      if (vals.length > 1) {
+          let minV = Math.min(...vals);
+          let maxV = Math.max(...vals);
+          let range = maxV - minV;
+          if (range < 20) range = 20; 
+          
+          let pad = range * 0.15;
+          minV -= pad;
+          maxV += pad;
+          
+          let w = 240, h = 26, startX = 10, baseY = 110; 
+          let pts = [];
+          vHistory.forEach((d, i) => {
+              let val = parseFloat(d.v);
+              if(!isNaN(val) && val > 0) {
+                  let px = startX + (i / (vHistory.length - 1)) * w;
+                  let py = baseY - ((val - minV) / (maxV - minV)) * h;
+                  pts.push(`${px},${py}`);
+              }
+          });
+          
+          if (pts.length > 0) {
+              let fillPts = `${startX},${baseY} ${pts.join(' ')} ${startX + w},${baseY}`;
+              graphSvg += `<polygon points="${fillPts}" fill="#d5d5d5"/>`; 
+              graphSvg += `<polyline points="${pts.join(' ')}" fill="none" stroke="#000" stroke-width="2.5" stroke-linejoin="round"/>`;
+          }
+      }
+  }
+
+  if (!graphSvg) {
+      let wBarWidth = Math.max(Math.min((windSpeed / 800) * 236, 236), 0);
+      if (windSpeed > 0 && wBarWidth < 6) wBarWidth = 6;
+      graphSvg = `<rect x="10" y="95" width="240" height="14" rx="7" fill="none" stroke="#000" stroke-width="2"/>
+                  <rect x="12" y="97" width="${wBarWidth}" height="10" rx="5" fill="#000"/>`;
+  }
+
+  let svg = `
+  <svg xmlns="http://www.w3.org/2000/svg" width="260" height="210" viewBox="0 0 260 210">
+    <style>.t { font-family: Arial, sans-serif; fill: #000; font-weight: bold; } .s { font-family: Arial, sans-serif; fill: #000; font-weight: bold; }</style>
+    
+    <text x="10" y="20" font-size="16" class="t" letter-spacing="1">СОЛНЕЧНЫЙ ВЕТЕР</text>
+    <line x1="10" y1="28" x2="250" y2="28" stroke="#000" stroke-width="3" stroke-linecap="round"/>
+
+    <text x="10" y="75" font-size="44" class="t">${windSpeed || "—"}</text>
+    <text x="105" y="75" font-size="16" class="s">км/с</text>
+    
+    ${graphSvg}
+    
+    <text x="10" y="130" font-size="13" class="s">Температура</text>
+    <text x="250" y="130" font-size="13" class="t" text-anchor="end">${t}${t !== "—" ? " К" : ""}</text>
+
+    <text x="10" y="155" font-size="13" class="s">Плотность</text>
+    <text x="250" y="155" font-size="13" class="t" text-anchor="end">${den}${den !== "—" ? " см⁻³" : ""}</text>
+
+    <text x="10" y="180" font-size="13" class="s">Поле Bt</text>
+    <text x="250" y="180" font-size="13" class="t" text-anchor="end">${bt}${bt !== "—" ? " нТл" : ""}</text>
+
+    <text x="10" y="205" font-size="13" class="s">Bz (Южное)</text>
+    <text x="250" y="205" font-size="13" class="t" text-anchor="end">${bz}${bz !== "—" ? " нТл" : ""}</text>
+  </svg>`;
+  
+  return "data:image/svg+xml;charset=utf-8," + encodeURIComponent(svg.replace(/\n\s*/g, ''));
+} catch (err) { 
+  return "data:image/svg+xml;charset=utf-8," + encodeURIComponent(`<svg width="260" height="210"><text y="20">Ошибка: ${err.message}</text></svg>`); 
+}
+
+```
+
