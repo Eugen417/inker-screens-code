@@ -37,12 +37,26 @@ template:
 1. В Inker перейдите в раздел **Screens > Import**.
 2. Откройте файл [inker_screen.json](inker_screen.json) в этом репозитории, скопируйте его содержимое целиком и нажмите **Import Screen**.
 3. После импорта обязательно зайдите в раздел Data Sources, внесите изменения в:
+
+**Источник 1 (Основной, Yandex Pogoda):** удалите и добавьте свои данные
+*   **Basic Information**
+    *   **Name:** `HA Yandex Pogoda`
 *   **Connection**
-    *   **URL:** `http://homeassistant.local:8123/api/states/weather.yandex_pogoda`
-    *   **HTTP Method:** `GET`
+    *   **URL:** `http://homeassistant.local:8123/api/states/weather.yandex_pogoda` проверьте ссылку
 *   **Custom Headers** *(Add headers for authentication)*
     *   **Header name:** `Authorization`
     *   **Header value:** `Bearer ВАШ_ТОКЕН_HA`
+
+**Источник 2 (Вспомогательный сенсор виджета):**
+*   **Basic Information**
+    *   **Name:** `HA Yandex Pogoda E-Paper`
+    *   **Type:** `JSON API`
+*   **Connection**
+    *   **URL:** `http://homeassistant.local:8123/api/states/sensor.eink_weather_widget` проверьте ссылку
+    *   **HTTP Method:** `GET`
+*   **Custom Headers** *(Add headers for authentication)* удалите и добавьте свои данные
+    *   **Header name:** `Authorization`
+    *   **Header value:** `Bearer ВАШ_ТОКЕН_HA` 
 
 
 
