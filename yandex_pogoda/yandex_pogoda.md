@@ -12,7 +12,29 @@
 
 ```yaml
 template:
-  - sensor:
+  - trigger:
+      # Запрашиваем стабильно раз в 15 минут
+      - platform: time_pattern
+        minutes: "/15"
+      # И при старте системы
+      - platform: homeassistant
+        event: start
+    action:
+      # 1. Запрашиваем почасовой прогноз
+      - service: weather.get_forecasts
+        data:
+          type: hourly
+        target:
+          entity_id: weather.yandex_pogoda
+        response_variable: hourly_data
+      # 2. Запрашиваем прогноз по дням
+      - service: weather.get_forecasts
+        data:
+          type: twice_daily
+        target:
+          entity_id: weather.yandex_pogoda
+        response_variable: daily_data
+    sensor:
       - name: "Eink Weather Widget"
         unique_id: eink_weather_widget
         icon: mdi:weather-cloudy-alert
@@ -23,11 +45,11 @@ template:
           apparent_temperature: "{{ state_attr('weather.yandex_pogoda', 'apparent_temperature') }}"
           yandex_condition: "{{ state_attr('weather.yandex_pogoda', 'yandex_condition') }}"
           
-          # --- ПРЯМОЙ ПЕРЕХВАТ МАССИВОВ С ПРОГНОЗОМ ---
+          # Записываем полученные ответы в атрибуты
           forecast_hourly: >
-            {{ state_attr('weather.yandex_pogoda', 'forecast_hourly') | to_json }}
+            {{ hourly_data['weather.yandex_pogoda'].forecast | to_json }}
           forecast_twice_daily: >
-            {{ state_attr('weather.yandex_pogoda', 'forecast_twice_daily') | to_json }}
+            {{ daily_data['weather.yandex_pogoda'].forecast | to_json }}
             
           next_rising: "{{ state_attr('sun.sun', 'next_rising') }}"
           next_setting: "{{ state_attr('sun.sun', 'next_setting') }}"
