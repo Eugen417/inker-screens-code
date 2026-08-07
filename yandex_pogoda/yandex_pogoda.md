@@ -592,19 +592,14 @@ try {
   else if (cond_raw.match(/rain|pour|shower|hail|light/)) iconId = 'i-rain';
   else if (cond_raw.match(/snow|sleet/)) iconId = 'i-snow';
 
-  // 5. АНАЛИЗАТОР СТРОГО НА СЕГОДНЯ
+  // 5. АНАЛИЗАТОР СТРОГО НА СЕГОДНЯ (С ТИПАМИ ОСАДКОВ)
   let minTemp = t_curr;
   let maxTemp = t_curr;
   let rainText = "Сегодня без осадков.";
 
   if (forecast && forecast.length > 0) {
-    // Берем дату самого первого часа (это и есть "сегодня")
     let todayStr = forecast[0].datetime.split('T')[0];
-    
-    // Оставляем часы СТРОГО до полуночи текущего дня
     let todayData = forecast.filter(d => d.datetime && d.datetime.startsWith(todayStr));
-    
-    // Фолбек на случай сбоя дат (берем ближайшие 12 часов)
     if (todayData.length === 0) todayData = forecast.slice(0, 12);
 
     let temps = todayData.map(d => d.native_temperature).filter(t => t !== undefined);
@@ -613,12 +608,29 @@ try {
       maxTemp = Math.max(...temps);
     }
 
-    // Умный поиск ЛЮБЫХ видов осадков (ищет по корням слов)
-    let rainHours = todayData
-      .filter(d => d.condition && d.condition.match(/rain|snow|sleet|pour|shower|hail|thunder|lightning/i))
-      .map(d => new Date(d.datetime).getHours());
+    // Ищем часы с осадками
+    let rainEvents = todayData.filter(d => d.condition && d.condition.match(/rain|snow|sleet|pour|shower|hail|thunder|lightning/i));
 
-    if (rainHours.length > 0) {
+    if (rainEvents.length > 0) {
+      // 5.1 Выделяем точные часы
+      let rainHours = rainEvents.map(d => new Date(d.datetime).getHours());
+      
+      // 5.2 Определяем тип осадков
+      let types = new Set();
+      rainEvents.forEach(d => {
+         let c = d.condition.toLowerCase();
+         if (c.includes('sleet') || c.includes('snowy-rainy')) types.add('мокрый снег');
+         else if (c.includes('snow')) types.add('снег');
+         else if (c.includes('pour') || c.includes('shower')) types.add('ливень');
+         else if (c.includes('hail')) types.add('град');
+         else if (c.includes('thunder') || c.includes('lightning')) types.add('гроза');
+         else if (c.includes('rain')) types.add('дождь');
+      });
+      
+      let typeStr = Array.from(types).join(' и ');
+      if (!typeStr) typeStr = "осадки";
+
+      // 5.3 Группируем часы (с ... до ...)
       let groups = [];
       let start = rainHours[0], prev = rainHours[0];
       
@@ -632,7 +644,9 @@ try {
       }
       let endHour = prev + 1 === 24 ? '24' : prev + 1;
       groups.push(`с ${start}:00 до ${endHour}:00`);
-      rainText = "Сегодня осадки " + groups.join(' и ') + ".";
+      
+      // Формируем итоговую фразу
+      rainText = "Сегодня " + typeStr + " " + groups.join(' и ') + ".";
     }
   }
 
