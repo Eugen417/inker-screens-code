@@ -12,21 +12,7 @@
 
 ```yaml
 template:
-  - trigger:
-      # Запрашиваем стабильно раз в 15 минут, игнорируя промежуточные скачки статуса
-      - platform: time_pattern
-        minutes: "/15"
-      # И при старте системы (оставляем)
-      - platform: homeassistant
-        event: start
-    action:
-      - service: weather.get_forecasts
-        data:
-          type: hourly
-        target:
-          entity_id: weather.yandex_pogoda
-        response_variable: hourly_forecast
-    sensor:
+  - sensor:
       - name: "Eink Weather Widget"
         unique_id: eink_weather_widget
         icon: mdi:weather-cloudy-alert
@@ -36,8 +22,13 @@ template:
           temperature: "{{ state_attr('weather.yandex_pogoda', 'temperature') }}"
           apparent_temperature: "{{ state_attr('weather.yandex_pogoda', 'apparent_temperature') }}"
           yandex_condition: "{{ state_attr('weather.yandex_pogoda', 'yandex_condition') }}"
-          # Оставляем всё как было у вас - это правильно!
-          forecast_hourly: "{{ hourly_forecast['weather.yandex_pogoda'].forecast | to_json }}"
+          
+          # --- ПРЯМОЙ ПЕРЕХВАТ МАССИВОВ С ПРОГНОЗОМ ---
+          forecast_hourly: >
+            {{ state_attr('weather.yandex_pogoda', 'forecast_hourly') | to_json }}
+          forecast_twice_daily: >
+            {{ state_attr('weather.yandex_pogoda', 'forecast_twice_daily') | to_json }}
+            
           next_rising: "{{ state_attr('sun.sun', 'next_rising') }}"
           next_setting: "{{ state_attr('sun.sun', 'next_setting') }}"
 ```
