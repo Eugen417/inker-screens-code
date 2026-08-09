@@ -615,7 +615,8 @@ try {
     let todayData = forecast.filter(d => d.datetime && d.datetime.startsWith(todayStr));
     if (todayData.length === 0) todayData = forecast.slice(0, 12);
 
-    let temps = todayData.map(d => d.native_temperature).filter(t => t !== undefined);
+    // ИСПРАВЛЕНИЕ: Ищем оба варианта ключей для температуры
+    let temps = todayData.map(d => d.temperature ?? d.native_temperature).filter(t => t !== undefined);
     if (temps.length > 0) {
       minTemp = Math.min(...temps);
       maxTemp = Math.max(...temps);
