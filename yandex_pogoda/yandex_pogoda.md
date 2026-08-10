@@ -23,7 +23,9 @@ template:
           apparent_temperature: "{{ state_attr('weather.yandex_pogoda', 'apparent_temperature') }}"
           yandex_condition: "{{ state_attr('weather.yandex_pogoda', 'yandex_condition') }}"
           
-          # Просто берем готовые массивы, которые УЖЕ лежат в Яндексе
+          # ЯВНО ДОБАВЛЯЕМ МИНИМАЛЬНУЮ ТЕМПЕРАТУРУ ИЗ ВАШЕГО СЕНСОРА:
+          min_temp_sensor: "{{ states('sensor.yandex_pogoda_minimal_forecast_temperature') }}"
+          
           forecast_hourly: >
             {{ state_attr('weather.yandex_pogoda', 'forecast_hourly') | to_json }}
           forecast_twice_daily: >
@@ -540,14 +542,11 @@ try {
   let src = typeof $ === 'string' ? JSON.parse($) : $;
   let weather = src.attributes || {};
   
-  // 1.1 ПРАВИЛЬНАЯ РАСПАКОВКА ПРОГНОЗА
+  // 1.1 РАСПАКОВКА ПОЧАСОВОГО ПРОГНОЗА
   let forecast = [];
   try {
-    if (typeof weather.forecast_hourly === 'string') {
-      forecast = JSON.parse(weather.forecast_hourly);
-    } else if (Array.isArray(weather.forecast_hourly)) {
-      forecast = weather.forecast_hourly;
-    }
+    if (typeof weather.forecast_hourly === 'string') forecast = JSON.parse(weather.forecast_hourly);
+    else if (Array.isArray(weather.forecast_hourly)) forecast = weather.forecast_hourly;
   } catch(e) {}
 
   // 2. БАЗОВЫЕ ЗНАЧЕНИЯ
@@ -583,31 +582,32 @@ try {
   else if (cond_raw.match(/rain|pour|shower|hail|light/)) iconId = 'i-rain';
   else if (cond_raw.match(/snow|sleet/)) iconId = 'i-snow';
 
-  // 5. АНАЛИЗАТОР СТРОГО НА СЕГОДНЯ (С ТИПАМИ ОСАДКОВ)
-  let minTemp = t_curr;
+  // 5. АНАЛИЗАТОР СТРОГО НА СЕГОДНЯ
+  
+  // МИНИМУМ БЕРЕМ СТРОГО ИЗ ВАШЕГО СЕНСОРА:
+  let minTemp = parseFloat(weather.min_temp_sensor);
+  if (isNaN(minTemp)) minTemp = t_curr; 
+  
   let maxTemp = t_curr;
   let rainText = "Сегодня без осадков.";
 
   if (forecast && forecast.length > 0) {
     let todayStr = forecast[0].datetime.split('T')[0];
     let todayData = forecast.filter(d => d.datetime && d.datetime.startsWith(todayStr));
-    if (todayData.length === 0) todayData = forecast.slice(0, 12);
-
-    // ИСПРАВЛЕНИЕ: Ищем оба варианта ключей для температуры
+    
+    // МАКСИМУМ: Ищем в оставшихся часах прогноза или берем текущую, если она выше
     let temps = todayData.map(d => d.temperature ?? d.native_temperature).filter(t => t !== undefined);
     if (temps.length > 0) {
-      minTemp = Math.min(...temps);
-      maxTemp = Math.max(...temps);
+        maxTemp = Math.max(...temps, maxTemp);
     }
 
-    // Ищем часы с осадками
+    // ПОИСК ОСАДКОВ:
+    if (todayData.length === 0) todayData = forecast.slice(0, 12);
     let rainEvents = todayData.filter(d => d.condition && d.condition.match(/rain|snow|sleet|pour|shower|hail|thunder|lightning/i));
 
     if (rainEvents.length > 0) {
-      // 5.1 Выделяем точные часы
       let rainHours = rainEvents.map(d => new Date(d.datetime).getHours());
       
-      // 5.2 Определяем тип осадков
       let types = new Set();
       rainEvents.forEach(d => {
          let c = d.condition.toLowerCase();
@@ -622,7 +622,6 @@ try {
       let typeStr = Array.from(types).join(' и ');
       if (!typeStr) typeStr = "осадки";
 
-      // 5.3 Группируем часы (с ... до ...)
       let groups = [];
       let start = rainHours[0], prev = rainHours[0];
       
@@ -637,7 +636,6 @@ try {
       let endHour = prev + 1 === 24 ? '24' : prev + 1;
       groups.push(`с ${start}:00 до ${endHour}:00`);
       
-      // Формируем итоговую фразу
       rainText = "Сегодня " + typeStr + " " + groups.join(' и ') + ".";
     }
   }
@@ -696,10 +694,10 @@ try {
     <text x="20" y="220" font-size="30" class="t">Ощущается: ${fSign}${t_feels}°</text>
     
     <path d="M25 245 v20 M18 258 L25 265 L32 258" class="i" stroke-width="3"/>
-    <text x="50" y="263" font-size="26" class="t">${minSign}${minTemp}°</text>
+    <text x="50" y="263" font-size="26" class="t">${minSign}${Math.round(minTemp)}°</text>
     
     <path d="M140 265 v-20 M133 252 L140 245 L147 252" class="i" stroke-width="3"/>
-    <text x="165" y="263" font-size="26" class="t">${maxSign}${maxTemp}°</text>
+    <text x="165" y="263" font-size="26" class="t">${maxSign}${Math.round(maxTemp)}°</text>
 
     <text x="560" y="263" font-size="34" text-anchor="end" class="t">${condText}</text>
 
