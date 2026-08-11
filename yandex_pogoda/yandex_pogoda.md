@@ -12,13 +12,35 @@
 
 ```yaml
 template:
-  - sensor:
+  - trigger:
+      - trigger: time_pattern
+        minutes: "/30" # Обновляем прогноз каждые 30 минут
+      - trigger: state
+        entity_id: weather.yandex_pogoda # И при любом изменении самой сущности погоды
+      - trigger: homeassistant
+        event: start
+    action:
+      # Запрашиваем почасовой прогноз и кладем в переменную
+      - action: weather.get_forecasts
+        data:
+          type: hourly
+        target:
+          entity_id: weather.yandex_pogoda
+        response_variable: hourly_res
+      # Запрашиваем дневной прогноз и кладем в переменную
+      - action: weather.get_forecasts
+        data:
+          type: twice_daily
+        target:
+          entity_id: weather.yandex_pogoda
+        response_variable: twice_daily_res
+    sensor:
       - name: "Eink Weather Widget"
         unique_id: eink_weather_widget
         icon: mdi:weather-cloudy-alert
         state: "{{ states('weather.yandex_pogoda') }}"
         attributes:
-          friendly_name: Eink Weather Widget
+          friendly_name: "Eink Weather Widget"
           temperature: "{{ state_attr('weather.yandex_pogoda', 'temperature') }}"
           apparent_temperature: "{{ state_attr('weather.yandex_pogoda', 'apparent_temperature') }}"
           yandex_condition: "{{ state_attr('weather.yandex_pogoda', 'yandex_condition') }}"
@@ -26,11 +48,11 @@ template:
           # ЯВНО ДОБАВЛЯЕМ МИНИМАЛЬНУЮ ТЕМПЕРАТУРУ ИЗ ВАШЕГО СЕНСОРА:
           min_temp_sensor: "{{ states('sensor.yandex_pogoda_minimal_forecast_temperature') }}"
           
-          # ПРЕВРАЩАЕМ В ТЕКСТОВУЮ СТРОКУ, ЧТОБЫ ОБОЙТИ БЛОКИРОВКУ HA:
+          # БЕРЕМ ПРОГНОЗЫ ИЗ ОТВЕТА action, А НЕ ИЗ АТРИБУТОВ:
           forecast_hourly: >
-            {{ state_attr('weather.yandex_pogoda', 'forecast_hourly') | to_json | string }}
+            {{ hourly_res['weather.yandex_pogoda'].forecast | to_json }}
           forecast_twice_daily: >
-            {{ state_attr('weather.yandex_pogoda', 'forecast_twice_daily') | to_json | string }}
+            {{ twice_daily_res['weather.yandex_pogoda'].forecast | to_json }}
             
           next_rising: "{{ state_attr('sun.sun', 'next_rising') }}"
           next_setting: "{{ state_attr('sun.sun', 'next_setting') }}"
