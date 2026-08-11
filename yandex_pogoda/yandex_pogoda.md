@@ -26,10 +26,11 @@ template:
           # ЯВНО ДОБАВЛЯЕМ МИНИМАЛЬНУЮ ТЕМПЕРАТУРУ ИЗ ВАШЕГО СЕНСОРА:
           min_temp_sensor: "{{ states('sensor.yandex_pogoda_minimal_forecast_temperature') }}"
           
+          # ПРЕВРАЩАЕМ В ТЕКСТОВУЮ СТРОКУ, ЧТОБЫ ОБОЙТИ БЛОКИРОВКУ HA:
           forecast_hourly: >
-            {{ state_attr('weather.yandex_pogoda', 'forecast_hourly') | to_json }}
+            {{ state_attr('weather.yandex_pogoda', 'forecast_hourly') | to_json | string }}
           forecast_twice_daily: >
-            {{ state_attr('weather.yandex_pogoda', 'forecast_twice_daily') | to_json }}
+            {{ state_attr('weather.yandex_pogoda', 'forecast_twice_daily') | to_json | string }}
             
           next_rising: "{{ state_attr('sun.sun', 'next_rising') }}"
           next_setting: "{{ state_attr('sun.sun', 'next_setting') }}"
