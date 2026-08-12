@@ -215,4 +215,5 @@ binary_sensor:
 
 ```
 
+** Полностью исправленный файл [esphome-trmnl.yaml](ESP_CONFIG_TRMNL/esphome-trmnl.yaml)
 
