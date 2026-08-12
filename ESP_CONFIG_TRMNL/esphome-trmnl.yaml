@@ -2,10 +2,14 @@
 # 2. Короткое нажатие пробуждает/перезагружает устройство
 # 3. Длинное нажатие (более 5 секунд) в активном режиме включает режим настройки в котором если плата подключена к wifi то отобразится qr-код со ссылкой на web-интерфейс, а если не подключена то qr-код со ссылкой на captive portal. В этом режиме устройство не засыпает 30 минут, а затем переходит в глубокий сон. 
 
+# Добавлен Native API
+# Изменён display, inverted true на false
+# Поправил логику нажатия кнопок для включения веб терминала
+
 substitutions:
   fw_version: "2.1.0 esphome-trmnl"
-  HA_url: "homeassistant.local:8123" # URL сервера Home Assistant
-  Inker_url: "homeassistant.local:8124" # URL сервера Inker
+  HA_url: "http://ha190.loc:8123" # URL сервера Home Assistant
+  Inker_url: "http://ha190.loc:8124" # URL сервера Inker
 
   wifi_ssid: !secret wifi_ssid # SSID Wi-Fi сети, к которой должен подключаться дисплей
   wifi_password: !secret wifi_password # Пароль от Wi-Fi сети
@@ -176,6 +180,10 @@ logger:
               - script.execute:
                   id: trmnl_error
                   error_msg: !lambda 'return std::string(message);'
+
+api:
+  encryption:
+    key: !secret trmnl__encryption_key
 
 ota:
   - platform: esphome
@@ -588,7 +596,7 @@ display:
   dc_pin: $dc_pin
   busy_pin: 
     number: $busy_pin
-    inverted: true # Для предотвращения необратимого повреждения дисплея необходимо инвертировать контакт BUSY на моделях gdew0154m09, Waveshare 7.30in-f и Waveshare 7.50in V2 (и наверно на V3 и других новых моделях). Установите для контакта busy значение inverted: true в настройках
+    inverted: false # Для предотвращения необратимого повреждения дисплея необходимо инвертировать контакт BUSY на моделях gdew0154m09, Waveshare 7.30in-f и Waveshare 7.50in V2 (и наверно на V3 и других новых моделях). Установите для контакта busy значение inverted: true в настройках
   reset_pin: $reset_pin
   reset_duration: $reset_duration
   model: $model
