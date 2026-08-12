@@ -51,7 +51,7 @@ template:
             {% set m = states('sensor.yandex_pogoda_minimal_forecast_temperature') %}
             {{ m if m not in ['unknown', 'unavailable', 'none'] else this.attributes.get('min_temp_sensor', 0) }}
           
-          # БРОНИРОВАННЫЕ МАССИВЫ ИЗ АТРИБУТОВ (С защитой от двойного JSON и пустоты)
+          # МАССИВЫ ИЗ АТРИБУТОВ (С защитой от двойного JSON и пустоты)
           forecast_hourly: >
             {% set new_h = state_attr('weather.yandex_pogoda', 'forecast_hourly') %}
             {% if new_h %}
