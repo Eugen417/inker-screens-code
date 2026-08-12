@@ -13,21 +13,32 @@
 ```yaml
 template:
   - trigger:
-      # 1. Основной триггер: срабатывает только при успешном обновлении данных Яндексом
       - platform: state
         entity_id: sensor.yandex_pogoda_data_update_time
-      # 2. Запасной таймер
       - platform: time_pattern
         minutes: "/15"
-      # 3. При запуске системы
       - platform: homeassistant
         event: start
+    action:
+      - service: weather.get_forecasts
+        continue_on_error: true
+        data:
+          type: hourly
+        target:
+          entity_id: weather.yandex_pogoda
+        response_variable: hourly_res
+      - service: weather.get_forecasts
+        continue_on_error: true
+        data:
+          type: twice_daily
+        target:
+          entity_id: weather.yandex_pogoda
+        response_variable: daily_res
     sensor:
       - name: "Eink Weather Widget"
         unique_id: eink_weather_widget
         icon: mdi:weather-cloudy-alert
         
-        # Если Яндекс недоступен, берем последнее известное состояние из кэша датчика (this)
         state: >
           {% set s = states('weather.yandex_pogoda') %}
           {{ s if s not in ['unknown', 'unavailable', 'none'] else this.state | default('cloudy', true) }}
@@ -51,25 +62,19 @@ template:
             {% set m = states('sensor.yandex_pogoda_minimal_forecast_temperature') %}
             {{ m if m not in ['unknown', 'unavailable', 'none'] else this.attributes.get('min_temp_sensor', 0) }}
           
-          # МАССИВЫ ИЗ АТРИБУТОВ (С защитой от двойного JSON и пустоты)
+          # Берем чистый массив, без to_json. HA сам разберется!
           forecast_hourly: >
-            {% set new_h = state_attr('weather.yandex_pogoda', 'forecast_hourly') %}
-            {% if new_h %}
-              {{ new_h if new_h is string else new_h | to_json }}
-            {% elif this is defined and this.attributes is defined %}
-              {{ this.attributes.get('forecast_hourly', '[]') }}
+            {% if hourly_res is defined and 'weather.yandex_pogoda' in hourly_res and hourly_res['weather.yandex_pogoda'].forecast is defined %}
+              {{ hourly_res['weather.yandex_pogoda'].forecast }}
             {% else %}
-              []
+              {{ this.attributes.get('forecast_hourly', []) }}
             {% endif %}
             
           forecast_twice_daily: >
-            {% set new_d = state_attr('weather.yandex_pogoda', 'forecast_twice_daily') %}
-            {% if new_d %}
-              {{ new_d if new_d is string else new_d | to_json }}
-            {% elif this is defined and this.attributes is defined %}
-              {{ this.attributes.get('forecast_twice_daily', '[]') }}
+            {% if daily_res is defined and 'weather.yandex_pogoda' in daily_res and daily_res['weather.yandex_pogoda'].forecast is defined %}
+              {{ daily_res['weather.yandex_pogoda'].forecast }}
             {% else %}
-              []
+              {{ this.attributes.get('forecast_twice_daily', []) }}
             {% endif %}
             
           next_rising: >
