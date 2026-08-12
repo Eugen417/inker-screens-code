@@ -1,0 +1,918 @@
+# 1. Длинное нажатие (более 5 секунд) в режиме глубокого сна сбрасывает принудительно установленный экран, интервал обновления и блокировку обновления дисплея в интеграции Home Assistant
+# 2. Короткое нажатие пробуждает/перезагружает устройство
+# 3. Длинное нажатие (более 5 секунд) в активном режиме включает режим настройки в котором если плата подключена к wifi то отобразится qr-код со ссылкой на web-интерфейс, а если не подключена то qr-код со ссылкой на captive portal. В этом режиме устройство не засыпает 30 минут, а затем переходит в глубокий сон. 
+
+substitutions:
+  fw_version: "2.1.0 esphome-trmnl"
+  HA_url: "homeassistant.local:8123" # URL сервера Home Assistant
+  Inker_url: "homeassistant.local:8124" # URL сервера Inker
+
+  wifi_ssid: !secret wifi_ssid # SSID Wi-Fi сети, к которой должен подключаться дисплей
+  wifi_password: !secret wifi_password # Пароль от Wi-Fi сети
+  wifi_ap_password: !secret trmnl_wifi_ap_password # Пароль для точки доступа дисплея
+  web_username: !secret trmnl_web_username # Имя пользователя для доступа к веб-интерфейсу дисплея
+  web_password: !secret trmnl_web_password # Пароль для доступа к веб-интерфейсу дисплея
+  ota_password: !secret trmnl_ota_password # Пароль для OTA обновлений
+
+  name: "trmnl" # Это имя дисплея. Может содержать только строчные буквы, цифры и дефисы и по умолчанию может иметь длину не более 24
+  friendly_name: "TRMNL" # Это имя отображается в интерфейсе Home Assistant
+  model: 7.50in-bV3 # Модель дисплея
+  wifi_output_power: 8.5dB # Величина мощности передачи для интерфейса Wi-Fi от 8,5 dB до 20,5 dB
+
+  img_type: BINARY # Указывает способ внутреннего кодирования изображения.
+  img_format: PNG # формат, в котором закодировано изображение.
+  img_url_setup_logo: http://raw.githubusercontent.com/kfattum/esphome-trmnl/refs/heads/main/img/setup-logo.bmp
+
+  deep_sleep_delay: 1000ms # Задержка перед сном для обновления экрана 
+  sleep_time: "3600" # (сек.) Время сна экрана по умолчанию 
+  error_sleep_duration: "1200" # (сек.) Время сна экрана при возникновении ошибки
+  reset_duration: 200ms # Длительность операции сброса дисплея
+  wifi_connect_delay: 15s # Время на попытку подключения к wifi
+  low_battery_threshold: "0.0" # V, Пороговое значение напряжения аккумулятора для отображения предупреждения о низком заряде. 0.0 = проверка отключена
+
+  # status_led: GPIO2
+  button: GPIO32 # Пин кнопки управления
+  adc_pin: GPIO34  # Пин АЦП (для мониторинга батареи)
+  deep_sleep_pin: GPIO32 # Пин для пробуждения из глубокого сна
+
+  clk_pin: GPIO13 # SPI CLK пин
+  mosi_pin: GPIO14 # SPI MOSI пин
+
+  cs_pin: GPIO15 # Chip Select пин
+  dc_pin: GPIO27 # Data/Command пин
+  busy_pin: GPIO25 # Busy status output pin (indicating busy)Для предотвращения необратимого повреждения дисплея необходимо инвертировать контакт BUSY на моделях gdew0154m09, Waveshare 7.30in-f и Waveshare 7.50in V2 (и наверно на V3 и других новых моделях). Установите для контакта busy значение inverted: true в настройках
+  reset_pin: GPIO26 # Пин аппаратного сброса дисплея 
+
+globals:
+  - id: device_id
+    type: std::string
+    max_restore_data_length: 13
+    restore_value: true
+    initial_value: '""'
+  - id: api_key
+    type: std::string
+    max_restore_data_length: 43
+    restore_value: true
+    initial_value: '""'
+  - id: sleep_time
+    type: uint32_t
+    initial_value: "$sleep_time"
+  - id: current_page_id
+    type: uint8_t
+    restore_value: true
+    initial_value: "0" # 0: нет данных, 1: trmnl_page, 2: failed, 3: pause_page 4: ota_page 5: ap_page
+  - id: ota_mod
+    type: bool
+    initial_value: "false"
+  # флаг для очистки screen_design_id_override
+  - id: clear_override_flag
+    type: bool
+    initial_value: "false"
+  - id: inker_url_dynamic
+    type: std::string
+    max_restore_data_length: 64
+    restore_value: true
+    initial_value: '"$Inker_url"'
+  - id: ha_url_dynamic
+    type: std::string
+    max_restore_data_length: 64
+    restore_value: true
+    initial_value: '"$HA_url"'
+
+  - id: override_screen_id
+    type: std::string
+    max_restore_data_length: 128
+    initial_value: '""'
+  - id: override_block_update
+    type: std::string
+    max_restore_data_length: 3
+    initial_value: '""'
+  - id: override_sleep_time
+    type: std::string
+    max_restore_data_length: 7
+    initial_value: '""'
+  - id: last_error_msg
+    type: std::string
+    initial_value: '""'
+
+esp32:
+  variant: ESP32
+  board: az-delivery-devkit-v4
+  framework:
+    type: esp-idf
+    advanced:
+      minimum_chip_revision: 3.1
+      sram1_as_iram: true
+  cpu_frequency: 160MHz
+  watchdog_timeout: 10 s
+esphome:
+  min_version: 2026.1.3 
+  name: $name
+  friendly_name: $friendly_name
+  on_boot:
+    priority: -10
+    then:
+      - delay: 100ms 
+      - if:
+          condition:
+            lambda: 'return id(back_button).state;' 
+          then:
+            - logger.log: "Кнопка зажата при старте! Взведен флаг очистки Screen Design ID Override."
+            - lambda: 'id(clear_override_flag) = true;'
+            # Ожидаем еще 4.9 сек для проверки на 5-секундное удержание (Режим настройки)
+            - delay: 4900ms
+            - if:
+                condition:
+                  lambda: 'return id(back_button).state;'
+                then:
+                  - logger.log: "Кнопка удерживалась 5 секунд! Активирован режим OTA."
+                  - lambda: 'id(ota_mod) = true;'
+                  
+      # Проверка наличия сохраненных данных Wi-Fi
+      - if:
+          condition:
+            lambda: 'return !wifi::global_wifi_component->has_sta();'
+          then:
+            - logger.log: "No saved Wi-Fi credentials! Entering AP setup mode."
+            - lambda: 'id(ota_mod) = true;'
+            - wait_until:
+                condition: wifi.ap_active
+                timeout: 15s
+            - script.execute: generate_qr_link_ap
+            - delay: 16ms
+            - script.execute:
+                id: safe_update_display
+                target_page: 5
+                force_update: true
+
+      # Продолжаем обычный запуск, если режим OTA не активен
+      - if:
+          condition:
+            lambda: 'return !id(ota_mod);'
+          then:
+            - delay: $wifi_connect_delay
+            - if:
+                condition:
+                  not:
+                    wifi.connected:
+                then:
+                  - script.execute:
+                      id: trmnl_error
+                      error_msg: "Wi-Fi timeout"
+
+  project:
+    name: "kfattum.esphome-trmnl"
+    version: "$fw_version"
+
+logger:
+  on_message:
+    - level: ERROR
+      then:
+        - if:
+            condition:
+              lambda: 'return !id(ota_mod);'
+            then:
+              - delay: 30s
+              - script.execute:
+                  id: trmnl_error
+                  error_msg: !lambda 'return std::string(message);'
+
+ota:
+  - platform: esphome
+    password: $ota_password
+  - platform: web_server
+
+web_server:
+  port: 80
+  version: 2 
+  auth:
+    username: $web_username 
+    password: $web_password 
+    
+captive_portal:
+  
+improv_serial:
+
+wifi:
+  ssid: $wifi_ssid
+  password: $wifi_password
+  min_auth_mode: WPA2
+  power_save_mode: LIGHT
+  fast_connect: true 
+  output_power: $wifi_output_power
+  ap:
+    ap_timeout: 15s
+    password: $wifi_ap_password
+  on_connect:
+    then:
+      # --- ФИКС ГОНКИ ПРИ ЗАГРУЗКЕ ---
+      # Ждем отпускания кнопки, либо включения ota_mod из on_boot (максимум 6 сек)
+      - wait_until:
+          condition:
+            or:
+              - lambda: 'return !id(back_button).state;'
+              - lambda: 'return id(ota_mod);'
+          timeout: 6s
+      # -------------------------------
+      - if:
+          condition:
+            lambda: 'return !id(ota_mod);'
+          then:
+            # ПРОВЕРКА ЗАРЯДА АККУМУЛЯТОРА
+            - if:
+                condition:
+                  and:
+                    - lambda: 'return id(low_battery_threshold).state > 0.0;' 
+                    - lambda: 'return id(battery_voltage).state > 0.0 && id(battery_voltage).state <= id(low_battery_threshold).state;' 
+                then:
+                  - logger.log: "Напряжение аккумулятора ниже установленного порога! Вывод экрана оповещения."
+                  - script.execute:
+                      id: safe_update_display
+                      target_page: 6 
+                      force_update: true
+                  - delay: $deep_sleep_delay
+                  - deep_sleep.enter:
+                      sleep_duration: 49 d
+                else:
+                  - script.execute: trmnl_config 
+          else:
+            - logger.log: "Wi-Fi подключен, активен OTA MODE"
+            - delay: 16ms
+            - script.execute: generate_qr_link_web_server
+            - delay: 16ms
+            - script.execute:
+                id: safe_update_display
+                target_page: 4 
+                force_update: true
+
+http_request:
+  buffer_size_tx: 1024
+  verify_ssl: False
+  timeout: 2s
+  watchdog_timeout: 3s
+
+deep_sleep:
+  wakeup_pin:
+    number: $deep_sleep_pin
+    allow_other_uses: true  
+    inverted: true 
+  run_duration: 30 min
+  sleep_duration: $error_sleep_duration s
+
+qr_code:
+  - id: qr_web_server
+    value: "placeholder"
+  - id: qr_ap
+    value: "placeholder"
+
+online_image:
+  - id: trmnl_image
+    format: $img_format
+    type: $img_type
+    buffer_size: 7000
+    url: $img_url_setup_logo
+    # resize: 800x480
+    on_download_finished:
+      - delay: 16ms
+      - wifi.disable:
+      - delay: 250ms
+      - script.execute:
+          id: safe_update_display
+          target_page: 1
+          force_update: true 
+    on_error:
+        - delay: 16ms
+        - script.execute:
+            id: trmnl_error
+            error_msg: "Image download failed"
+
+script:
+  # 1. Скрипт получения конфигурации по HTTP
+  - id: trmnl_config
+    then:
+      # Проверяем флаг сброса
+      - if:
+          condition:
+            lambda: 'return id(clear_override_flag);'
+          then:
+            - logger.log: "Выполняется сброс Screen Design ID Override на сервере..."
+            - http_request.post:
+                url: !lambda 'return (id(ha_url_dynamic) + "/api/config/clear").c_str();'
+                request_headers:
+                  ID: !lambda 'return id(mac_address_sensor).state.c_str();'
+            - delay: 100 ms
+      - logger.log: "Запрос конфигурации у Home Assistant"
+      - http_request.get:
+          url: !lambda 'return (id(ha_url_dynamic) + "/api/config/").c_str();'
+          request_headers:
+            ID: !lambda 'return id(mac_address_sensor).state.c_str();'
+            Battery-Voltage: !lambda 'return id(battery_voltage_text).state.c_str();'
+            Battery-Voltage-prc: !lambda 'return id(battery_voltage_prc_text).state.c_str();'
+            Wi-Fi-Signal-dB-prc: !lambda 'return id(wifi_signal_db_prc_text).state.c_str();'
+          capture_response: true 
+          on_response:
+            - if:
+                condition:
+                  lambda: return response->status_code >= 200 && response->status_code < 300;
+                then:
+                  - logger.log:
+                      format: "HTTP Config Response: %s"
+                      args: [body.c_str()]
+                  - lambda: |-
+                      json::parse_json(body, [](JsonObject root) -> bool {
+                        if (root["screen_design_id_override"].is<std::string>()) {
+                          id(override_screen_id) = root["screen_design_id_override"].as<std::string>();
+                        }
+                        if (root["block_update"].is<std::string>()) {
+                          id(override_block_update) = root["block_update"].as<std::string>();
+                        }
+                        if (root["sleep_time"].is<std::string>()) {
+                          id(override_sleep_time) = root["sleep_time"].as<std::string>();
+                        }
+                        return true;
+                      });
+
+                else:
+                  - logger.log:
+                      format: "HTTP Config Failed. HTTP Status: %d"
+                      args: [response->status_code]
+            - script.execute: trmnl_router
+          on_error:
+            - logger.log: "Ошибка HTTP при получении конфига. "
+            - script.execute: trmnl_router
+
+  # Роутер: направляет либо в Setup, либо в Update
+  - id: trmnl_router
+    then:
+      - if:
+          condition:
+            lambda: |-
+              return id(device_id).empty() || id(api_key).empty();
+          then:
+            - script.execute: trmnl_setup
+          else:
+            - script.execute: trmnl_update
+
+  - id: trmnl_setup
+    then:
+      - logger.log: "Setting up TRMNL"
+      - http_request.get:
+          url: !lambda 'return (id(inker_url_dynamic) + "/api/setup/").c_str();'
+          request_headers:
+            ID: !lambda 'return id(mac_address_sensor).state.c_str();'
+          capture_response: true
+          on_response:
+            - if:
+                condition:
+                  lambda: return response->status_code >= 200 && response->status_code < 300;
+                then:
+                  - logger.log:
+                      format: "TRMNL Setup Response: %s"
+                      args: [body.c_str()]
+                  - lambda: |-
+                      json::parse_json(body, [](JsonObject root) -> bool {
+                        id(api_key) = root["api_key"].as<std::string>();
+                        id(device_id) = root["friendly_id"].as<std::string>();
+                        global_preferences->sync();
+                        return true;
+                      });
+                  - delay: 16ms
+                  - script.execute: trmnl_update
+                else:
+                  - logger.log:
+                      format: "TRMNL Setup Failed. HTTP Status: %d"
+                      args: [response->status_code]
+                  - script.execute:
+                      id: trmnl_error
+                      error_msg: !lambda 'return "Setup HTTP Status: " + std::to_string(response->status_code);'
+          on_error:
+            - logger.log: "TRMNL Setup Connection Error / Timeout"
+            - script.execute:
+                id: trmnl_error
+                error_msg: "Error connecting to Inker / Timeout"
+
+  - id: trmnl_update
+    then:
+      - if:
+          condition:
+            lambda: 'return id(override_block_update) == "true";'
+          then:
+            - logger.log: "Обновление дисплея заблокировано сервером"
+            - lambda: |-
+                // Чтение и проверка override_sleep_time при блокировке
+                std::string http_sleep_str = id(override_sleep_time);
+                if (!http_sleep_str.empty()) {
+                  uint32_t new_sleep = strtoul(http_sleep_str.c_str(), nullptr, 10);
+                  if (new_sleep > 59 && id(sleep_time) != new_sleep) {
+                    id(sleep_time) = new_sleep;
+                    ESP_LOGD("update", "Обновлен sleep_time из override_sleep_time: %u", id(sleep_time));
+                  }
+                }
+            - delay: 16ms
+            - script.execute:
+                id: safe_update_display
+                target_page: 3 # ID страницы pause_page
+                force_update: false
+            - delay: $deep_sleep_delay
+            - deep_sleep.enter:
+                sleep_duration: !lambda 'return id(sleep_time) * 1000;'
+          else:
+            - logger.log: "Updating TRMNL image"
+            - http_request.get:
+                url: !lambda 'return (id(inker_url_dynamic) + "/api/display/").c_str();'
+                request_headers:
+                  ID: !lambda 'return id(mac_address_sensor).state.c_str();'
+                  Access-Token: !lambda 'return id(api_key).c_str();'
+                  Battery-Voltage: !lambda 'return id(battery_voltage_text).state.c_str();'
+                  Refresh-Rate: !lambda 'return std::to_string(id(sleep_time)).c_str();'
+                  FW-Version: !lambda 'return "$fw_version";'
+                  RSSI: !lambda 'return id(rssi_text).state.c_str();'
+                capture_response: true
+                on_response:
+                  - delay: 16ms
+                  - if:
+                      condition:
+                        lambda: return response->status_code >= 200 && response->status_code < 300;
+                      then:
+                        - logger.log:
+                            format: "TRMNL Update Response: %s"
+                            args: [body.c_str()]
+                        - delay: 16ms
+                        - lambda: |-
+                            json::parse_json(body, [](JsonObject root) -> bool {
+                              if (root["status"].is<int>() && root["status"].as<int>() == 0) {
+                                std::string override_str = id(override_screen_id);
+                                
+                                // Если строка не пустая и содержит прямую ссылку
+                                if (!override_str.empty() && override_str.find("http") == 0) {
+                                  id(trmnl_image).set_url(override_str);
+                                  ESP_LOGD("update", "Используется прямая ссылка на изображение (Override)");
+                                } else {
+                                  id(trmnl_image).set_url(root["image_url"].as<std::string>());
+                                }
+                                
+                                // Логика определения sleep_time
+                                std::string http_sleep_str = id(override_sleep_time);
+                                
+                                // Проверяем, есть ли что-то в конфиге HTTP
+                                if (!http_sleep_str.empty()) {
+                                  uint32_t http_sleep = strtoul(http_sleep_str.c_str(), nullptr, 10);
+                                  
+                                  if (http_sleep > 59) {
+                                    id(sleep_time) = http_sleep;
+                                    ESP_LOGD("update", "Используется sleep_time из HA (HTTP Config): %u", id(sleep_time));
+                                  } else {
+                                    id(sleep_time) = root["refresh_rate"].as<uint32_t>();
+                                    ESP_LOGW("update", "HTTP Config sleep_time некорректен, используем данные inker: %u", id(sleep_time));
+                                  }
+                                } else {
+                                  id(sleep_time) = root["refresh_rate"].as<uint32_t>();
+                                  ESP_LOGD("update", "HTTP Config пустое, используется sleep_time от inker: %u", id(sleep_time));
+                                }
+                              }
+                              return true;
+                            });
+                        - delay: 16ms
+                        - component.update: trmnl_image
+                      else:
+                        - logger.log:
+                            format: "TRMNL Update Failed. HTTP Status: %d"
+                            args: [response->status_code]
+                        - script.execute:
+                            id: trmnl_error
+                            error_msg: !lambda 'return "Update HTTP Status: " + std::to_string(response->status_code);'
+                on_error:
+                  - logger.log: "TRMNL Update Connection Error / Timeout"
+                  - script.execute:
+                      id: trmnl_error
+                      error_msg: "Error connecting to Inker / Timeout"
+
+  - id: trmnl_error
+    parameters:
+      error_msg: std::string
+    then:
+      - lambda: 'id(last_error_msg) = error_msg;'
+      - if:
+          condition:
+            lambda: 'return !id(ota_mod);'
+          then:
+            - script.execute:
+                id: safe_update_display
+                target_page: 2
+                force_update: false
+            - delay: $deep_sleep_delay
+            - deep_sleep.enter:
+                sleep_duration: $error_sleep_duration s
+          else:
+            - logger.log: "Ошибка произошла в OTA режиме, сон отменен."
+
+  - id: safe_update_display
+    parameters:
+      target_page: uint8_t
+      force_update: bool
+    then:
+      - if:
+          condition:
+            or:
+              - lambda: 'return id(current_page_id) != target_page;'
+              - lambda: 'return force_update;'
+          then:
+            - delay: 16ms
+            - lambda: |-
+                id(current_page_id) = target_page; // Запоминаем/подтверждаем новую страницу
+                if (target_page == 1) {
+                  id(trmnl_display).show_page(id(trmnl_page));
+                  ESP_LOGD("display", "Обновление экрана: trmnl_page");
+                } else if (target_page == 2) {
+                  id(trmnl_display).show_page(id(failed));
+                  ESP_LOGD("display", "Обновление экрана: failed");
+                } else if (target_page == 3) {
+                  id(trmnl_display).show_page(id(pause_page));
+                  ESP_LOGD("display", "Обновление экрана: pause_page");
+                } else if (target_page == 4) { 
+                  id(trmnl_display).show_page(id(ota_page)); 
+                  ESP_LOGD("display", "Обновление экрана: ota_page");
+                } else if (target_page == 5) { 
+                  id(trmnl_display).show_page(id(ap_page)); 
+                  ESP_LOGD("display", "Обновление экрана: ap_page");
+                } else if (target_page == 6) { 
+                  id(trmnl_display).show_page(id(battery_low_page)); 
+                  ESP_LOGD("display", "Обновление экрана: battery_low_page");
+                }
+            - delay: 16ms
+            - component.update: trmnl_display
+            - delay: $deep_sleep_delay
+            - if:
+                condition:
+                  lambda: 'return !id(ota_mod);' # Не засыпать, если OTA активен
+                then:
+                  - deep_sleep.enter:
+                      sleep_duration: !lambda 'return id(sleep_time) * 1000;'
+
+          else:
+            - logger.log: "Экран уже отображает эту страницу, перерисовка пропущена."
+
+  - id: generate_qr_link_web_server
+    mode: restart
+    then:
+      - lambda: |-
+          std::string domain = App.get_name() + ".local";
+          std::string auth_url = "http://" + domain;
+          id(qr_web_server).set_value(auth_url);
+          ESP_LOGI("custom", "QR-код с сылкой на веб-сервер успешно создан: %s", auth_url.c_str());
+
+  - id: generate_qr_link_ap
+    mode: restart
+    then:
+      - lambda: |-
+          // Получаем текущее имя устройства (с учетом mac-суффикса, например, trmnl-a1b2c3)
+          std::string ssid = App.get_name();
+          
+          // Формируем строку QR-кода для Wi-Fi. 
+          std::string wifi_qr = "WIFI:S:" + ssid + ";T:WPA;P:$wifi_ap_password;;";
+          
+          // Записываем полученную строку в QR-код дисплея
+          id(qr_ap).set_value(wifi_qr);
+          
+          ESP_LOGI("custom", "QR-код для точки доступа успешно обновлен: %s", wifi_qr.c_str());
+
+
+spi:
+  clk_pin: $clk_pin
+  mosi_pin: $mosi_pin
+
+display:
+  platform: waveshare_epaper
+  id: trmnl_display
+  cs_pin: $cs_pin
+  dc_pin: $dc_pin
+  busy_pin: 
+    number: $busy_pin
+    inverted: true # Для предотвращения необратимого повреждения дисплея необходимо инвертировать контакт BUSY на моделях gdew0154m09, Waveshare 7.30in-f и Waveshare 7.50in V2 (и наверно на V3 и других новых моделях). Установите для контакта busy значение inverted: true в настройках
+  reset_pin: $reset_pin
+  reset_duration: $reset_duration
+  model: $model
+  update_interval: never
+  pages:
+    - id: trmnl_page
+      lambda: |-
+        it.image(0, 0, id(trmnl_image), COLOR_OFF, COLOR_ON);
+
+    - id: failed
+      lambda: |-
+        int center_x = it.get_width() / 2;
+        int center_y = it.get_height() / 2;
+        
+        if (id(sys_language).current_option() == "EN") {
+          it.printf(center_x, center_y, id(pixel_font), COLOR_ON, TextAlign::CENTER, "ERROR");
+        } else {
+          it.printf(center_x, center_y, id(pixel_font), COLOR_ON, TextAlign::CENTER, "ОШИБКА");
+        }
+
+        it.printf(center_x, center_y + 60, id(pixel_font_20), COLOR_ON, TextAlign::CENTER, "%s", id(last_error_msg).c_str());
+
+    - id: pause_page
+      lambda: |-
+        // it.image(it.get_width() / 2, it.get_height() / 3, id(pause_image), ImageAlign::CENTER, COLOR_OFF, COLOR_ON);
+        it.fill(COLOR_OFF);
+        
+    - id: ota_page
+      lambda: |-
+        int center_x = it.get_width() / 2; // Центр по X
+        int center_y = it.get_height() / 2; // середина по Y
+
+        auto qr_pixels = id(qr_web_server).get_size() * 5; // Размер QR-кода
+        auto qr_x = center_x - (qr_pixels / 2); // QR-код по центру X
+        auto qr_y = center_y + 60; // ТЕКСТ 1 + 60
+
+        auto text_20_y = qr_y + qr_pixels + 20; // ТЕКСТ 2 + Y QR-код + 20
+
+        it.qr_code(qr_x, qr_y, id(qr_web_server), COLOR_ON, 5);
+
+        if (id(sys_language).current_option() == "EN") {
+          it.printf(center_x, center_y, id(pixel_font), COLOR_ON, TextAlign::CENTER, "SETUP MODE");
+          it.printf(center_x, text_20_y, id(pixel_font_20), COLOR_ON, TextAlign::CENTER, "Web server");
+        } else {
+          it.printf(center_x, center_y, id(pixel_font), COLOR_ON, TextAlign::CENTER, "РЕЖИМ НАСТРОЙКИ");
+          it.printf(center_x, text_20_y, id(pixel_font_20), COLOR_ON, TextAlign::CENTER, "Web сервер");
+        }
+    - id: ap_page
+      lambda: |-
+        int center_x = it.get_width() / 2; // Центр по X
+        int center_y = it.get_height() / 2; // середина по Y
+
+        auto qr_pixels = id(qr_ap).get_size() * 5; // Размер QR-кода
+        auto qr_x = center_x - (qr_pixels / 2); // QR-код по центру X
+        auto qr_y = center_y + 60; // ТЕКСТ 1 + 60
+
+        auto text_20_y = qr_y + qr_pixels + 20; // ТЕКСТ 2 + Y QR-код + 20
+
+        it.qr_code(qr_x, qr_y, id(qr_ap), COLOR_ON, 5);
+
+        if (id(sys_language).current_option() == "EN") {
+          it.printf(center_x, center_y, id(pixel_font), COLOR_ON, TextAlign::CENTER, "SETUP MODE");
+          it.printf(center_x, text_20_y, id(pixel_font_20), COLOR_ON, TextAlign::CENTER, "Scan QR code to connect to Wi-Fi");
+        } else {
+          it.printf(center_x, center_y, id(pixel_font), COLOR_ON, TextAlign::CENTER, "РЕЖИМ НАСТРОЙКИ");
+          it.printf(center_x, text_20_y, id(pixel_font_20), COLOR_ON, TextAlign::CENTER, "Отсканируйте QR код и подключите к своей wifi сети");
+        }
+    - id: battery_low_page
+      lambda: |-
+        int center_x = it.get_width() / 2; // Центр по X
+        int center_y = it.get_height() / 2; // Середина по Y
+
+        // Получаем реальную ширину и высоту картинки
+        int img_w = id(battery_low_image).get_width();
+        int img_h = id(battery_low_image).get_height();
+
+        // 1. Главный текст (чуть выше центра)
+        int text_main_y = center_y; 
+        
+        // 2. Картинка 
+        int img_x = center_x - (img_w / 2);
+        int img_y = center_y - (img_h / 2) + 120; // Небольшое смещение под текст
+
+        // 3. Напряжение 
+        int text_20_y = img_y + (img_h / 2); 
+
+        // Вывод главного текста 
+        if (id(sys_language).current_option() == "EN") {
+          it.printf(center_x, text_main_y, id(pixel_font), COLOR_ON, TextAlign::CENTER, "LOW BATTERY");
+        } else {
+          it.printf(center_x, text_main_y, id(pixel_font), COLOR_ON, TextAlign::CENTER, "БАТАРЕЯ РАЗРЯЖЕНА");
+        }
+
+        // Отрисовка иконки
+        it.image(img_x, img_y, id(battery_low_image), COLOR_ON, COLOR_OFF);
+
+        // Вывод напряжения
+        it.printf(center_x, text_20_y, id(pixel_font_20), COLOR_ON, TextAlign::CENTER, "%.2fV", id(battery_voltage).state);
+        
+font:
+  - file: "https://github.com/IdreesInc/Monocraft/releases/download/v3.0/Monocraft.ttf"
+    id: pixel_font
+    size: 64 
+    glyphs: "БАТРЕЯ ЗЖНLOWBATERYОШИКUPMDМСЙS"
+
+  - file: "https://github.com/IdreesInc/Monocraft/releases/download/v3.0/Monocraft.ttf"
+    id: pixel_font_20
+    size: 20 
+    glyphs: "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyzАБВГДЕЁЖЗИЙКЛМНОПРСТУФХЦЧШЩЪЫЬЭЮЯабвгдеёжзийклмнопрстуфхцчшщъыьэюя0123456789 /-.:,;!?"
+
+image:
+#   - file: "https://raw.githubusercontent.com/kfattum/esphome-trmnl/refs/heads/main/img/smail-dithered.png"
+#     id: pause_image
+#     type: BINARY
+  - file: "https://raw.githubusercontent.com/kfattum/esphome-trmnl/refs/heads/main/img/battery-dithered.png"
+    id: battery_low_image
+    type: BINARY
+
+button:
+  - platform: factory_reset
+    name: "Factory Reset"
+    id: factory_reset_button
+
+  - platform: restart
+    name: "Restart"
+    id: restart_button
+
+binary_sensor:
+  - platform: gpio
+    name: Button
+    id: back_button
+    pin:
+      number: GPIO32
+      mode:
+        input: true
+        pullup: true
+      allow_other_uses: true  
+      inverted: true
+    internal: True
+    filters:
+      - delayed_on_off: 20ms
+    on_multi_click:
+      # 1. Удержание кнопки более 5 секунд — Запуск OTA-режима (в активном состоянии)
+      - timing:
+          - ON for at least 5s
+        then:
+          - logger.log: "Удержание кнопки 5 сек! Вход в режим OTA."
+          - lambda: 'id(ota_mod) = true;'
+          - if:
+              condition: wifi.connected
+              then:
+                - script.execute: generate_qr_link_web_server
+                - script.execute:
+                    id: safe_update_display
+                    target_page: 4 
+                    force_update: true
+              else:
+                - wait_until:
+                    condition: wifi.ap_active
+                    timeout: 20s
+                - if:
+                    condition: wifi.ap_active
+                    then:
+                      - script.execute: generate_qr_link_ap
+                      - script.execute:
+                          id: safe_update_display
+                          target_page: 5 
+                          force_update: true
+
+      # 2. Короткое нажатие — Перезагрузка
+      - timing:
+          - ON for at most 1s
+          - OFF for at least 0.5s
+        then:
+          - button.press: restart_button
+
+sensor:
+  - platform: adc
+    name: "Battery Voltage"
+    icon: "mdi:alpha-v-circle"
+    entity_category: "diagnostic"
+    id: battery_voltage
+    pin: $adc_pin
+    attenuation: 12db
+    samples: 128
+    filters:
+      - multiply: 2
+      - round: 2
+      - calibrate_linear:
+           - 3.22 -> 3.75
+           - 3.64 -> 4.19
+           - 3.89 -> 4.20
+    on_value:
+      - text_sensor.template.publish:
+          id: battery_voltage_text
+          state: !lambda 'return str_sprintf("%.2f", x).c_str();'
+
+  - platform: copy
+    id: battery_voltage_prc
+    name: "Battery Level"
+    source_id: battery_voltage
+    unit_of_measurement: "%"
+    icon: "mdi:battery"
+    device_class: battery
+    state_class: measurement
+    filters:
+      - calibrate_linear:
+          - 4.20 -> 100
+          - 4.19 -> 99
+          - 3.75 -> 80
+          - 3.60 -> 0
+      - round: 0
+      - clamp:
+          min_value: 0
+          max_value: 100
+    accuracy_decimals: 0
+    on_value:
+      - text_sensor.template.publish:
+          id: battery_voltage_prc_text
+          state: !lambda 'return str_sprintf("%.2f", x).c_str();'
+
+  - platform: wifi_signal # Reports the WiFi signal strength/RSSI in dB
+    name: "Wi-Fi Signal, dB"
+    id: wifi_signal_db
+    update_interval: never
+    entity_category: "diagnostic"
+    disabled_by_default: true
+    on_value:
+      - text_sensor.template.publish:
+          id: rssi_text
+          state: !lambda 'return str_sprintf("%.0f", x).c_str();'
+
+  - platform: copy # Reports the WiFi signal strength in %
+    id: wifi_signal_db_prc
+    source_id: wifi_signal_db
+    name: "Wi-Fi Signal"
+    filters:
+      - lambda: return min(max(2 * (x + 100.0), 0.0), 100.0);
+    unit_of_measurement: "%"
+    entity_category: "diagnostic"
+    device_class: ""
+    on_value:
+      - text_sensor.template.publish:
+          id: wifi_signal_db_prc_text
+          state: !lambda 'return str_sprintf("%.2f", x).c_str();'
+
+text_sensor:
+  - platform: wifi_info
+    mac_address:
+      id: mac_address_sensor
+
+  - platform: template
+    id: battery_voltage_text
+    update_interval: never
+
+  - platform: template
+    id: rssi_text
+    update_interval: never
+
+  - platform: template
+    id: battery_voltage_prc_text
+    update_interval: never
+
+  - platform: template
+    id: wifi_signal_db_prc_text
+    update_interval: never
+
+text:
+  - platform: template
+    name: "Inker Server URL"
+    mode: text
+    optimistic: true
+    on_value:
+      - if:
+          condition:
+            lambda: 'return x != "" && x != id(inker_url_dynamic);'
+          then:
+            - delay: 16ms
+            - lambda: |-
+                id(inker_url_dynamic) = x;
+                global_preferences->sync(); // Сохраняем во flash-память ESP32
+            - logger.log:
+                format: "URL сервера Inker принудительно изменен на: %s"
+                args: [ 'id(inker_url_dynamic).c_str()' ]
+
+  - platform: template
+    name: "Home Assistant Server URL"
+    mode: text
+    optimistic: true
+    on_value:
+      - if:
+          condition:
+            lambda: 'return x != "" && x != id(ha_url_dynamic);'
+          then:
+            - delay: 16ms
+            - lambda: |-
+                id(ha_url_dynamic) = x;
+                global_preferences->sync(); // Сохраняем во flash-память ESP32
+            - logger.log:
+                format: "URL сервера Home Assistant принудительно изменен на: %s"
+                args: [ 'id(ha_url_dynamic).c_str()' ]
+
+select:
+  - platform: template
+    name: "Language"
+    id: sys_language
+    entity_category: config
+    optimistic: true
+    options:
+      - "RU"
+      - "EN"
+    initial_option: "EN"
+    restore_value: true
+
+number:
+  - platform: template
+    name: "Low Battery Threshold"
+    id: low_battery_threshold
+    entity_category: config
+    optimistic: true
+    restore_value: true
+    initial_value: "$low_battery_threshold" # 0.0 = проверка отключена
+    min_value: 0.0
+    max_value: 4.2
+    step: 0.05
+    unit_of_measurement: "V"
+    mode: box
