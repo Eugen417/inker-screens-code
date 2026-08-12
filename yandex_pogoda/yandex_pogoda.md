@@ -62,19 +62,27 @@ template:
             {% set m = states('sensor.yandex_pogoda_minimal_forecast_temperature') %}
             {{ m if m not in ['unknown', 'unavailable', 'none'] else this.attributes.get('min_temp_sensor', 0) }}
           
-          # Берем чистый массив, без to_json. HA сам разберется!
+          # РУЧНОЙ КОНВЕРТЕР В JSON: Переводим объекты datetime в текстовые строки
           forecast_hourly: >
             {% if hourly_res is defined and 'weather.yandex_pogoda' in hourly_res and hourly_res['weather.yandex_pogoda'].forecast is defined %}
-              {{ hourly_res['weather.yandex_pogoda'].forecast }}
+              {% set ns = namespace(res=[]) %}
+              {% for item in hourly_res['weather.yandex_pogoda'].forecast %}
+                {% set ns.res = ns.res + [dict(item, datetime=item.datetime | string)] %}
+              {% endfor %}
+              {{ ns.res | to_json }}
             {% else %}
-              {{ this.attributes.get('forecast_hourly', []) }}
+              {{ this.attributes.get('forecast_hourly', '[]') }}
             {% endif %}
             
           forecast_twice_daily: >
             {% if daily_res is defined and 'weather.yandex_pogoda' in daily_res and daily_res['weather.yandex_pogoda'].forecast is defined %}
-              {{ daily_res['weather.yandex_pogoda'].forecast }}
+              {% set ns = namespace(res=[]) %}
+              {% for item in daily_res['weather.yandex_pogoda'].forecast %}
+                {% set ns.res = ns.res + [dict(item, datetime=item.datetime | string)] %}
+              {% endfor %}
+              {{ ns.res | to_json }}
             {% else %}
-              {{ this.attributes.get('forecast_twice_daily', []) }}
+              {{ this.attributes.get('forecast_twice_daily', '[]') }}
             {% endif %}
             
           next_rising: >
