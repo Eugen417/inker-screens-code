@@ -13,49 +13,69 @@
 ```yaml
 template:
   - trigger:
-      - trigger: time_pattern
-        minutes: "/30" # Обновляем прогноз каждые 30 минут
-      - trigger: state
-        entity_id: weather.yandex_pogoda # И при любом изменении самой сущности погоды
-      - trigger: homeassistant
+      # 1. Основной триггер: срабатывает только при успешном обновлении данных Яндексом
+      - platform: state
+        entity_id: sensor.yandex_pogoda_data_update_time
+      # 2. Запасной таймер
+      - platform: time_pattern
+        minutes: "/15"
+      # 3. При запуске системы
+      - platform: homeassistant
         event: start
-    action:
-      # Запрашиваем почасовой прогноз и кладем в переменную
-      - action: weather.get_forecasts
-        data:
-          type: hourly
-        target:
-          entity_id: weather.yandex_pogoda
-        response_variable: hourly_res
-      # Запрашиваем дневной прогноз и кладем в переменную
-      - action: weather.get_forecasts
-        data:
-          type: twice_daily
-        target:
-          entity_id: weather.yandex_pogoda
-        response_variable: twice_daily_res
     sensor:
       - name: "Eink Weather Widget"
         unique_id: eink_weather_widget
         icon: mdi:weather-cloudy-alert
-        state: "{{ states('weather.yandex_pogoda') }}"
+        
+        # Если Яндекс недоступен, берем последнее известное состояние из кэша датчика (this)
+        state: >
+          {% set s = states('weather.yandex_pogoda') %}
+          {{ s if s not in ['unknown', 'unavailable', 'none'] else this.state | default('cloudy', true) }}
+          
         attributes:
           friendly_name: "Eink Weather Widget"
-          temperature: "{{ state_attr('weather.yandex_pogoda', 'temperature') }}"
-          apparent_temperature: "{{ state_attr('weather.yandex_pogoda', 'apparent_temperature') }}"
-          yandex_condition: "{{ state_attr('weather.yandex_pogoda', 'yandex_condition') }}"
           
-          # ЯВНО ДОБАВЛЯЕМ МИНИМАЛЬНУЮ ТЕМПЕРАТУРУ ИЗ ВАШЕГО СЕНСОРА:
-          min_temp_sensor: "{{ states('sensor.yandex_pogoda_minimal_forecast_temperature') }}"
-          
-          # БЕРЕМ ПРОГНОЗЫ ИЗ ОТВЕТА action, А НЕ ИЗ АТРИБУТОВ:
-          forecast_hourly: >
-            {{ hourly_res['weather.yandex_pogoda'].forecast | to_json }}
-          forecast_twice_daily: >
-            {{ twice_daily_res['weather.yandex_pogoda'].forecast | to_json }}
+          temperature: >
+            {% set t = state_attr('weather.yandex_pogoda', 'temperature') %}
+            {{ t if t is not none else this.attributes.get('temperature', 0) }}
             
-          next_rising: "{{ state_attr('sun.sun', 'next_rising') }}"
-          next_setting: "{{ state_attr('sun.sun', 'next_setting') }}"
+          apparent_temperature: >
+            {% set at = state_attr('weather.yandex_pogoda', 'apparent_temperature') %}
+            {{ at if at is not none else this.attributes.get('apparent_temperature', 0) }}
+            
+          yandex_condition: >
+            {% set c = state_attr('weather.yandex_pogoda', 'yandex_condition') %}
+            {{ c if c is not none else this.attributes.get('yandex_condition', 'cloudy') }}
+            
+          min_temp_sensor: >
+            {% set m = states('sensor.yandex_pogoda_minimal_forecast_temperature') %}
+            {{ m if m not in ['unknown', 'unavailable', 'none'] else this.attributes.get('min_temp_sensor', 0) }}
+          
+          # БРОНИРОВАННЫЕ МАССИВЫ ИЗ АТРИБУТОВ (С защитой от двойного JSON и пустоты)
+          forecast_hourly: >
+            {% set new_h = state_attr('weather.yandex_pogoda', 'forecast_hourly') %}
+            {% if new_h %}
+              {{ new_h if new_h is string else new_h | to_json }}
+            {% elif this is defined and this.attributes is defined %}
+              {{ this.attributes.get('forecast_hourly', '[]') }}
+            {% else %}
+              []
+            {% endif %}
+            
+          forecast_twice_daily: >
+            {% set new_d = state_attr('weather.yandex_pogoda', 'forecast_twice_daily') %}
+            {% if new_d %}
+              {{ new_d if new_d is string else new_d | to_json }}
+            {% elif this is defined and this.attributes is defined %}
+              {{ this.attributes.get('forecast_twice_daily', '[]') }}
+            {% else %}
+              []
+            {% endif %}
+            
+          next_rising: >
+            {{ state_attr('sun.sun', 'next_rising') | default(this.attributes.get('next_rising', ''), true) }}
+          next_setting: >
+            {{ state_attr('sun.sun', 'next_setting') | default(this.attributes.get('next_setting', ''), true) }}
 ```
 
 > **Проверка:** Перед установкой виджетов зайдите в HA в меню *Панель разработчика > Состояния* и убедитесь, что сущности `weather.yandex_pogoda` и `sensor.eink_weather_widget` существуют и отдают данные.
